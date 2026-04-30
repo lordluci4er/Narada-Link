@@ -1,9 +1,17 @@
 import admin from "firebase-admin";
 
-// 🔥 ENV se JSON read kar
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_SERVICE_ACCOUNT
-);
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // 🔥 Render (production)
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  // 💻 Local development
+  const fs = await import("fs");
+  serviceAccount = JSON.parse(
+    fs.readFileSync(new URL("./firebaseServiceAccount.json", import.meta.url))
+  );
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
