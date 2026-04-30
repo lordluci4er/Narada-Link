@@ -1,0 +1,80 @@
+import 'package:flutter/material.dart';
+import '../utils/colors.dart';
+import 'chat_screen.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+
+      appBar: AppBar(
+        title: const Text("Narada Link"),
+        centerTitle: true,
+        backgroundColor: AppColors.background,
+        elevation: 0,
+      ),
+
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          children: [
+            const SizedBox(height: 10),
+
+            // 🔥 Start Chat Card
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChatScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.chat, color: AppColors.primary),
+                    SizedBox(width: 12),
+                    Text(
+                      "Start Chat",
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 🔥 Future feature placeholder
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.input,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                "Search users coming soon...",
+                style: TextStyle(
+                  color: AppColors.secondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

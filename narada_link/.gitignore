@@ -1,0 +1,48 @@
+# 🔥 Sensitive files (VERY IMPORTANT)
+google-services.json
+firebaseServiceAccount.json
+.env
+
+# 🔐 Keystore (release build secrets)
+*.jks
+*.keystore
+key.properties
+
+# 🔥 Gradle / Android
+.gradle/
+local.properties
+/android/.gradle/
+/android/app/build/
+/android/build/
+
+# 🔥 Build outputs
+/build/
+/coverage/
+/out/
+
+# 🔥 Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# 🔥 IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# 🔥 Logs
+*.log
+*.tmp
+
+# 🔥 OS files
+.DS_Store
+Thumbs.db
+
+# 🔥 Misc
+*.swp
+*.lock
