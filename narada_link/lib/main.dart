@@ -4,8 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/username_screen.dart'; // 🔥 NEW
+import 'screens/username_screen.dart';
+import 'screens/main_screen.dart'; // 🔥 ADD THIS
 import 'utils/colors.dart';
 
 void main() async {
@@ -59,12 +59,8 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      /// 🔥 Routes
-      routes: {
-        "/home": (_) => const HomeScreen(),
-      },
+      // ❌ ROUTES REMOVED (no longer needed)
 
-      /// 🔥 Smart Auth Routing
       home: const AuthWrapper(),
     );
   }
@@ -98,7 +94,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
 
-    /// 🔄 Loading Screen
+    // 🔄 Loading Screen
     if (isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -110,9 +106,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    /// 🔥 FINAL ROUTING LOGIC
-    if (auth.isLoggedIn) {
-      return const HomeScreen();
+    // 🔥 FINAL FLOW (IMPORTANT ORDER)
+    if (auth.isLoggedIn && auth.token != null) {
+      return MainScreen(jwt: auth.token!); // ✅ MAIN NAVIGATION ENTRY
     }
 
     if (auth.needsUsername && auth.token != null) {

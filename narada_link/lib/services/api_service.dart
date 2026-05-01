@@ -28,6 +28,7 @@ class ApiService {
 
       print("❌ Login failed: ${response.body}");
       return null;
+
     } catch (e) {
       print("🔥 API Error (Login): $e");
 
@@ -82,8 +83,38 @@ class ApiService {
 
       print("❌ Username failed: ${res.body}");
       return null;
+
     } catch (e) {
       print("🔥 Username error: $e");
+      return null;
+    }
+  }
+
+  /// 👤 Get Current User (Profile)
+  static Future<Map<String, dynamic>?> getMe(String token) async {
+    try {
+      print("👤 Fetching current user...");
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/api/users/me"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      print("📡 getMe Status: ${response.statusCode}");
+      print("📡 getMe Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      print("❌ getMe failed: ${response.body}");
+      return null;
+
+    } catch (e) {
+      print("🔥 getMe error: $e");
       return null;
     }
   }
@@ -109,6 +140,7 @@ class ApiService {
 
       print("❌ Search failed: ${response.body}");
       return [];
+
     } catch (e) {
       print("🔥 Search error: $e");
       return [];
@@ -136,6 +168,7 @@ class ApiService {
 
       print("❌ Messages failed: ${response.body}");
       return [];
+
     } catch (e) {
       print("🔥 Message fetch error: $e");
       return [];
