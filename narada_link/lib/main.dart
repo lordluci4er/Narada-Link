@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/username_screen.dart'; // 🔥 NEW
 import 'utils/colors.dart';
 
 void main() async {
@@ -58,7 +59,12 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      /// 🔥 AUTO LOGIN HANDLER
+      /// 🔥 Routes
+      routes: {
+        "/home": (_) => const HomeScreen(),
+      },
+
+      /// 🔥 Smart Auth Routing
       home: const AuthWrapper(),
     );
   }
@@ -104,9 +110,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    /// 🔐 Route decide
-    return auth.isLoggedIn
-        ? const HomeScreen()
-        : const LoginScreen();
+    /// 🔥 FINAL ROUTING LOGIC
+    if (auth.isLoggedIn) {
+      return const HomeScreen();
+    }
+
+    if (auth.needsUsername && auth.token != null) {
+      return UsernameScreen(jwt: auth.token!);
+    }
+
+    return const LoginScreen();
   }
 }

@@ -6,28 +6,53 @@ export const setUsername = async (req, res) => {
   try {
     const { username } = req.body;
 
-    // ✅ Validation
-    const error = validateUsername(username);
+    // ❌ Missing
+    if (!username) {
+      return res.status(400).json({ msg: "Username required" });
+    }
+
+    // 🔤 Normalize
+    const clean = username.toLowerCase().trim();
+
+    // ✅ Validation (external + fallback)
+    const error = validateUsername ? validateUsername(clean) : null;
     if (error) {
       return res.status(400).json({ msg: error });
     }
 
-    // ✅ Check if username already exists
-    const exists = await User.findOne({ username });
-    if (exists) {
-      return res.status(400).json({ msg: "Username already taken" });
+    // 🔒 Ensure user exists
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ msg: "User not found" });
     }
 
-    // ✅ Update current user
-    const user = await User.findByIdAndUpdate(
-      req.user,
-      { username },
+    // ❌ Prevent changing username again (optional but recommended)
+    if (currentUser.username) {
+      return res.status(400).json({
+        msg: "Username already set. Cannot change."
+      });
+    }
+
+    // ⚡ ATOMIC update (race-condition safe)
+    const updated = await User.findOneAndUpdate(
+      {
+        _id: req.user.id,
+        username: { $in: [null, ""] } // only if not set
+      },
+      { $set: { username: clean } },
       { new: true }
     ).select("-__v");
 
-    res.json(user);
+    if (!updated) {
+      return res.status(400).json({
+        msg: "Username already set or conflict occurred"
+      });
+    }
+
+    res.json({ user: updated });
 
   } catch (err) {
+    console.error("Set Username Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
@@ -38,20 +63,22 @@ export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
 
-    // ❗ Agar empty search ho
     if (!username) {
       return res.status(400).json({ msg: "Search query required" });
     }
 
+    const clean = username.toLowerCase().trim();
+
     const users = await User.find({
-      username: { $regex: username, $options: "i" }
+      username: { $regex: clean, $options: "i" }
     })
-      .select("-__v")
-      .limit(20); // 🔥 limit laga diya performance ke liye
+      .select("username avatar email") // 🔥 optimized
+      .limit(20);
 
     res.json(users);
 
   } catch (err) {
+    console.error("Search Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };

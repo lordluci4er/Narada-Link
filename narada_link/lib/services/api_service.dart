@@ -15,9 +15,7 @@ class ApiService {
             headers: {
               "Content-Type": "application/json",
             },
-            body: jsonEncode({
-              "token": token,
-            }),
+            body: jsonEncode({"token": token}),
           )
           .timeout(const Duration(seconds: 20));
 
@@ -26,36 +24,66 @@ class ApiService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
-      } else {
-        print("❌ Login failed: ${response.body}");
-        return null;
       }
+
+      print("❌ Login failed: ${response.body}");
+      return null;
     } catch (e) {
       print("🔥 API Error (Login): $e");
 
-      // 🔁 Retry once (Render cold start fix)
+      // 🔁 Retry (Render cold start fix)
       try {
-        print("🔁 Retrying login request...");
-        final retryResponse = await http.post(
+        print("🔁 Retrying login...");
+        final retry = await http.post(
           Uri.parse("$baseUrl/api/auth/google"),
           headers: {
             "Content-Type": "application/json",
           },
-          body: jsonEncode({
-            "token": token,
-          }),
+          body: jsonEncode({"token": token}),
         );
 
-        print("📡 Retry Status: ${retryResponse.statusCode}");
-        print("📡 Retry Body: ${retryResponse.body}");
+        print("📡 Retry Status: ${retry.statusCode}");
+        print("📡 Retry Body: ${retry.body}");
 
-        if (retryResponse.statusCode == 200) {
-          return jsonDecode(retryResponse.body);
+        if (retry.statusCode == 200) {
+          return jsonDecode(retry.body);
         }
       } catch (e) {
         print("❌ Retry failed: $e");
       }
 
+      return null;
+    }
+  }
+
+  /// 🆕 Set Username
+  static Future<Map<String, dynamic>?> setUsername(
+    String username,
+    String jwt,
+  ) async {
+    try {
+      print("👤 Setting username: $username");
+
+      final res = await http.post(
+        Uri.parse("$baseUrl/api/users/set-username"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"username": username}),
+      );
+
+      print("📡 Username Status: ${res.statusCode}");
+      print("📡 Username Body: ${res.body}");
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+
+      print("❌ Username failed: ${res.body}");
+      return null;
+    } catch (e) {
+      print("🔥 Username error: $e");
       return null;
     }
   }
@@ -77,10 +105,10 @@ class ApiService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
-      } else {
-        print("❌ Search failed: ${response.body}");
-        return [];
       }
+
+      print("❌ Search failed: ${response.body}");
+      return [];
     } catch (e) {
       print("🔥 Search error: $e");
       return [];
@@ -104,10 +132,10 @@ class ApiService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
-      } else {
-        print("❌ Messages failed: ${response.body}");
-        return [];
       }
+
+      print("❌ Messages failed: ${response.body}");
+      return [];
     } catch (e) {
       print("🔥 Message fetch error: $e");
       return [];

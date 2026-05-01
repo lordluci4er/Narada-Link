@@ -3,7 +3,9 @@ import '../services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   bool isLoggedIn = false;
+  bool needsUsername = false; // 🔥 NEW
   String? token;
+  Map<String, dynamic>? user; // 🔥 NEW
 
   final AuthService _authService = AuthService();
 
@@ -18,13 +20,25 @@ class AuthProvider extends ChangeNotifier {
 
       if (response != null && response['token'] != null) {
         token = response['token'];
+        user = response['user'];
 
         print("🔐 JWT stored: $token");
+        print("👤 User data: $user");
 
-        isLoggedIn = true;
+        // 🔥 Username check
+        if (user?['username'] == null || user?['username'] == "") {
+          needsUsername = true;
+          isLoggedIn = false;
+
+          print("⚠️ Username not set → go to UsernameScreen");
+        } else {
+          needsUsername = false;
+          isLoggedIn = true;
+
+          print("✅ Login complete → HomeScreen");
+        }
+
         notifyListeners();
-
-        print("✅ Login successful → HomeScreen");
       } else {
         print("❌ Login failed: Response null or token missing");
       }
@@ -44,7 +58,14 @@ class AuthProvider extends ChangeNotifier {
 
       if (savedToken != null) {
         token = savedToken;
+
+        // ⚠️ IMPORTANT:
+        // yaha ideally backend se user fetch karna chahiye
+        // abhi assume kar rahe hain login complete hai
+
         isLoggedIn = true;
+        needsUsername = false;
+
         notifyListeners();
 
         print("✅ Auto login success");
@@ -64,7 +85,10 @@ class AuthProvider extends ChangeNotifier {
       await _authService.logout();
 
       token = null;
+      user = null;
       isLoggedIn = false;
+      needsUsername = false;
+
       notifyListeners();
 
       print("✅ Logout successful");

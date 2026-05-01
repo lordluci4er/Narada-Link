@@ -1,10 +1,17 @@
 import express from "express";
-import { setUsername, searchUsers } from "../controllers/userController.js";
-import auth from "../middleware/authMiddleware.js";
+import {
+  setUsername,
+  searchUsers
+} from "../controllers/userController.js";
+
+import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/username", auth, setUsername);
-router.get("/search", auth, searchUsers);
+// 🔥 Set username (first time setup)
+router.post("/set-username", protect, setUsername);
+
+// 🔍 Search users (chat / add friend / explore)
+router.get("/search", protect, searchUsers);
 
 export default router;
