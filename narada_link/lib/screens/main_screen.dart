@@ -15,16 +15,26 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int currentIndex = 0;
 
-  late final screens = [
-    const HomeScreen(),
-    const SearchScreen(),
-    ProfileScreen(jwt: widget.jwt),
-  ];
+  late final List<Widget> screens;
+
+  @override
+  void initState() {
+    super.initState();
+
+    screens = [
+      HomeScreen(jwt: widget.jwt), // 🔥 FIXED (IMPORTANT)
+      SearchScreen(jwt: widget.jwt),
+      ProfileScreen(jwt: widget.jwt),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: screens[currentIndex],
+      body: IndexedStack(
+        index: currentIndex,
+        children: screens,
+      ),
 
       bottomNavigationBar: CustomBottomNav(
         currentIndex: currentIndex,

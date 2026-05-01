@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'main_screen.dart'; // 🔥 NEW IMPORT
+import 'main_screen.dart';
 
 class UsernameScreen extends StatefulWidget {
   final String jwt;
@@ -15,10 +15,25 @@ class _UsernameScreenState extends State<UsernameScreen> {
   String error = "";
   bool loading = false;
 
+  @override
+  void dispose() {
+    controller.dispose(); // 🔥 memory safe
+    super.dispose();
+  }
+
   void submit() async {
-    if (controller.text.trim().isEmpty) {
+    final username = controller.text.trim();
+
+    if (username.isEmpty) {
       setState(() {
         error = "Username cannot be empty";
+      });
+      return;
+    }
+
+    if (username.length < 3) {
+      setState(() {
+        error = "Minimum 3 characters required";
       });
       return;
     }
@@ -28,17 +43,15 @@ class _UsernameScreenState extends State<UsernameScreen> {
       error = "";
     });
 
-    final res = await ApiService.setUsername(
-      controller.text,
-      widget.jwt,
-    );
+    final res = await ApiService.setUsername(username, widget.jwt);
+
+    if (!mounted) return; // 🔥 safety
 
     setState(() {
       loading = false;
     });
 
     if (res != null) {
-      // 🔥 UPDATED NAVIGATION
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -55,34 +68,72 @@ class _UsernameScreenState extends State<UsernameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Choose Username")),
+      resizeToAvoidBottomInset: true,
+
+      appBar: AppBar(
+        title: const Text("Choose Username"),
+        centerTitle: true,
+      ),
+
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: "Enter username",
-                border: OutlineInputBorder(),
+            const SizedBox(height: 20),
+
+            // 🔥 Title
+            const Text(
+              "Create your identity",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 10),
 
-            if (error.isNotEmpty)
-              Text(error, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
 
-            const SizedBox(height: 10),
+            const Text(
+              "This will be visible to others",
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 13,
+              ),
+            ),
 
-            ElevatedButton(
-              onPressed: loading ? null : submit,
-              child: loading
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text("Continue"),
+            const SizedBox(height: 20),
+
+            // 🔥 Input
+            TextField(
+              controller: controller,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => submit(),
+              decoration: InputDecoration(
+                hintText: "Enter username",
+                errorText: error.isEmpty ? null : error,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 🔥 Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: loading ? null : submit,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: loading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text("Continue"),
+              ),
             ),
           ],
         ),
