@@ -1,16 +1,34 @@
 import jwt from "jsonwebtoken";
 
 const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const authHeader = req.headers.authorization;
 
-  if (!token) return res.status(401).json({ msg: "No token" });
+  // 🔍 Check header exists
+  if (!authHeader) {
+    return res.status(401).json({ msg: "No token provided" });
+  }
+
+  // 🔍 Extract token
+  const token = authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ msg: "Invalid token format" });
+  }
 
   try {
+    // 🔐 Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded.id;
+
+    // ✅ FIX: store full object (NOT just id)
+    req.user = decoded;
+
+    // 🧪 Debug (optional)
+    console.log("✅ Authenticated User:", req.user);
+
     next();
-  } catch {
-    res.status(401).json({ msg: "Invalid token" });
+  } catch (error) {
+    console.error("❌ Token Error:", error.message);
+    return res.status(401).json({ msg: "Invalid or expired token" });
   }
 };
 
