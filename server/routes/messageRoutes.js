@@ -4,6 +4,7 @@ import {
   sendMessage,
   getMessages,
   getRecentChats,
+  getConversations, // 🔥 added
 } from "../controllers/messageController.js";
 
 const router = express.Router();
@@ -12,7 +13,11 @@ const router = express.Router();
 // POST /api/messages
 router.post("/", protect, sendMessage);
 
-/// 🔥 GET RECENT CHATS (⚠️ must be before :userId)
+/// 🔥 GET CONVERSATIONS (WITH USER DATA)
+// GET /api/messages/conversations
+router.get("/conversations", protect, getConversations);
+
+/// 🔥 GET RECENT CHATS
 // GET /api/messages/recent
 router.get("/recent", protect, getRecentChats);
 

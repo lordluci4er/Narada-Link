@@ -61,13 +61,10 @@ export const getMessages = async (req, res) => {
     const myId = (req.user?.id || req.user).toString();
     const userId = req.params.userId.toString();
 
-    const myObjectId = new mongoose.Types.ObjectId(myId);
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-
     const messages = await Message.find({
       $or: [
-        { senderId: myObjectId, receiverId: userObjectId },
-        { senderId: userObjectId, receiverId: myObjectId },
+        { senderId: myId, receiverId: userId },
+        { senderId: userId, receiverId: myId },
       ],
     }).sort({ createdAt: 1 });
 
@@ -86,7 +83,7 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 GET RECENT CHATS (CHAT LIST)
+/// 🔥 GET RECENT CHATS (BASIC LIST)
 export const getRecentChats = async (req, res) => {
   try {
     const userId = (req.user?.id || req.user).toString();
@@ -100,7 +97,6 @@ export const getRecentChats = async (req, res) => {
           ],
         },
       },
-
       { $sort: { createdAt: -1 } },
 
       {
@@ -120,7 +116,7 @@ export const getRecentChats = async (req, res) => {
           _id: "$chatUser",
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
-          senderId: { $first: "$senderId" }, // 🔥 added
+          senderId: { $first: "$senderId" },
         },
       },
 
@@ -131,6 +127,80 @@ export const getRecentChats = async (req, res) => {
 
   } catch (err) {
     console.error("Recent Chats Error:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+
+/// 🔥 GET CONVERSATIONS (WITH USER DETAILS)
+export const getConversations = async (req, res) => {
+  try {
+    const myId = (req.user?.id || req.user).toString();
+
+    const messages = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: myId },
+            { receiverId: myId },
+          ],
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+
+      {
+        $addFields: {
+          chatUser: {
+            $cond: [
+              { $eq: ["$senderId", myId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+        },
+      },
+
+      {
+        $group: {
+          _id: "$chatUser",
+          lastMessage: { $first: "$text" },
+          senderId: { $first: "$senderId" },
+          createdAt: { $first: "$createdAt" },
+        },
+      },
+
+      /// 🔥 JOIN USER DATA
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+
+      { $unwind: "$user" },
+
+      /// 🔥 FINAL SHAPE
+      {
+        $project: {
+          userId: "$_id",
+          username: "$user.username",
+          avatar: "$user.avatar",
+          lastMessage: 1,
+          senderId: 1,
+          createdAt: 1,
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    res.json(messages);
+
+  } catch (err) {
+    console.error("Conversations Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };

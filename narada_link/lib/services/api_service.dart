@@ -157,11 +157,31 @@ class ApiService {
     }
   }
 
-  /// 💬 GET RECENT CHATS (🔥 NEW)
+  /// 💬 GET RECENT CHATS
   static Future<List> getRecentChats(String jwt) async {
     try {
       final response = await http.get(
         Uri.parse("$baseUrl/api/messages/recent"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 💬 GET CONVERSATIONS (🔥 NEW - FULL DATA)
+  static Future<List> getConversations(String jwt) async {
+    try {
+      final response = await http.get(
+        Uri.parse("$baseUrl/api/messages/conversations"), // ✅ FIXED
         headers: {
           "Authorization": "Bearer $jwt",
         },

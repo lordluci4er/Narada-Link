@@ -30,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     loadChats();
 
-    /// 🔥 SOCKET CONNECT
     socket.connect(userId: widget.myId);
 
     /// 🔥 REALTIME REFRESH
@@ -45,9 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// 🔥 LOAD RECENT CHATS
+  /// 🔥 LOAD CONVERSATIONS (NEW API)
   void loadChats() async {
-    final data = await ApiService.getRecentChats(widget.jwt);
+    final data = await ApiService.getConversations(widget.jwt);
 
     if (!mounted) return;
 
@@ -208,15 +207,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       itemCount: chats.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final chat = chats[index];
 
-        final userId = chat['_id'];
-        final lastMessage = chat['lastMessage'] ?? "";
+        final userId = chat['userId'];
+        final username = chat['username'] ?? "User";
+        final avatar = chat['avatar'];
+        final lastMessageRaw = chat['lastMessage'] ?? "";
 
         final isMe =
             chat['senderId'].toString() == widget.myId.toString();
+
+        final lastMessage =
+            isMe ? "You: $lastMessageRaw" : lastMessageRaw;
 
         return GestureDetector(
           onTap: () {
@@ -242,18 +246,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: AppColors.input,
-                  child: Text(
-                    userId.toString()[0].toUpperCase(),
-                    style: const TextStyle(color: AppColors.primary),
-                  ),
+                  backgroundImage:
+                      avatar != null ? NetworkImage(avatar) : null,
+                  child: avatar == null
+                      ? Text(
+                          username[0].toUpperCase(),
+                          style: const TextStyle(color: AppColors.primary),
+                        )
+                      : null,
                 ),
+
                 const SizedBox(width: 12),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        userId,
+                        username,
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -261,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isMe ? "You: $lastMessage" : lastMessage,
+                        lastMessage,
                         style: const TextStyle(
                           color: AppColors.secondary,
                           fontSize: 12,

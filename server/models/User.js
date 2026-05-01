@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       unique: true,
-      sparse: true, // 🔥 allows multiple null usernames
+      sparse: true, // ✅ allow null usernames
       trim: true,
       lowercase: true,
       minlength: 3,
@@ -28,11 +28,24 @@ const userSchema = new mongoose.Schema(
 
     avatar: {
       type: String,
+      default: null, // ✅ safer
     },
 
-    // 🔥 NEW FIELD (VERY IMPORTANT)
+    /// 🔔 FCM TOKEN
     fcmToken: {
       type: String,
+      default: null,
+    },
+
+    /// 🟢 ONLINE STATUS (future use)
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+
+    /// ⏱ LAST SEEN (future use)
+    lastSeen: {
+      type: Date,
       default: null,
     },
   },
