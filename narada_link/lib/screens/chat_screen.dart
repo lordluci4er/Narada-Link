@@ -31,36 +31,18 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    loadMessages();
 
     socket.connect(userId: widget.myId);
 
+    /// 🔥 ALWAYS reload on any incoming message
     socket.onMessage((data) {
-      final senderId = data['senderId'].toString();
-      final receiverId = data['receiverId'].toString();
-
-      // ✅ Only accept messages of THIS chat
-      final isThisChat =
-          (senderId == widget.userId && receiverId == widget.myId);
-
-      if (!isThisChat) return;
-
-      // ✅ Prevent duplicate (IMPORTANT)
-      final alreadyExists = messages.any((m) =>
-          m['text'] == data['text'] &&
-          m['senderId'].toString() == senderId);
-
-      if (alreadyExists) return;
-
-      setState(() {
-        messages.add(data);
-      });
-
-      scrollToBottom();
+      loadMessages(); // ✅ simple & stable
     });
+
+    loadMessages();
   }
 
-  /// 🔥 LOAD OLD MESSAGES
+  /// 🔥 LOAD MESSAGES FROM DB
   void loadMessages() async {
     try {
       final data = await ApiService.getMessages(
@@ -95,30 +77,14 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SEND MESSAGE
+  /// 🔥 SEND MESSAGE (FIXED ORDER)
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
 
-    final msg = {
-      "senderId": widget.myId.toString(),
-      "receiverId": widget.userId.toString(),
-      "text": text,
-      "local": true, // 🔥 mark as local
-    };
-
-    // ✅ Optimistic UI
-    setState(() {
-      messages.add(msg);
-    });
-
     controller.clear();
-    scrollToBottom();
 
-    // 🔥 realtime send
-    socket.sendMessage(msg);
-
-    // 🔥 save in DB
+    // 🔥 1. SAVE IN DB
     final success = await ApiService.sendMessage(
       widget.userId,
       text,
@@ -127,7 +93,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (!success) {
       print("❌ Send failed");
+      return;
     }
+
+    // 🔥 2. SOCKET NOTIFY
+    socket.sendMessage({
+      "senderId": widget.myId.toString(),
+      "receiverId": widget.userId.toString(),
+      "text": text,
+    });
+
+    // 🔥 3. RELOAD FROM DB
+    loadMessages();
   }
 
   @override
@@ -152,6 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            /// 🔄 LOADING
             if (loading)
               const Expanded(
                 child: Center(child: CircularProgressIndicator()),
@@ -169,14 +147,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         m['senderId'].toString() == widget.myId.toString();
 
                     return MessageBubble(
-                      text: m['text'] ?? "",
+                      text: (m['text'] ?? m['message'] ?? "").toString(),
                       isMe: isMe,
                     );
                   },
                 ),
               ),
 
-            /// ✍️ INPUT
+            /// ✍️ INPUT BOX
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

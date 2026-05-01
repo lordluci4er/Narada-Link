@@ -1,61 +1,55 @@
 import Message from "../models/Message.js";
 
-const users = {}; // 🔥 userId -> socketId mapping
-
 const initSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("⚡ Connected:", socket.id);
 
-    // 🔥 USER JOIN
+    /// 🔥 USER JOIN (room based)
     socket.on("join", (userId) => {
       if (!userId) return;
 
-      users[userId] = socket.id;
-      socket.join(userId);
+      const userIdStr = userId.toString();
+      socket.join(userIdStr);
 
-      console.log("👤 Joined:", userId);
+      console.log("👤 Joined:", userIdStr);
     });
 
-    // 🔥 SEND MESSAGE
-    socket.on("send_message", async (data) => {
+    /// 🔥 NEW MESSAGE TRIGGER (NO DB SAVE HERE)
+    socket.on("send_message", (data) => {
       try {
         const { senderId, receiverId, text } = data;
 
-        // ❌ validation
+        // ✅ validation
         if (!senderId || !receiverId || !text) {
-          return socket.emit("error", "Invalid message data");
+          return socket.emit("error", "Invalid data");
         }
 
-        // 💾 save to DB
-        const msg = await Message.create({
-          senderId,
-          receiverId,
+        const senderIdStr = senderId.toString();
+        const receiverIdStr = receiverId.toString();
+
+        // 🔥 SEND TO RECEIVER (with text)
+        io.to(receiverIdStr).emit("receive_message", {
+          senderId: senderIdStr,
+          receiverId: receiverIdStr,
+          text: text, // ✅ FIXED (MAIN ISSUE)
+        });
+
+        // 🔥 optional debug log
+        console.log("📨 Message Triggered:", {
+          from: senderIdStr,
+          to: receiverIdStr,
           text,
         });
 
-        // 🔥 send to receiver (room based)
-        io.to(receiverId).emit("receive_message", msg);
-
-        // 🔥 also send back to sender (sync)
-        io.to(senderId).emit("receive_message", msg);
-
       } catch (error) {
-        console.error("❌ Socket Message Error:", error.message);
-        socket.emit("error", "Message failed");
+        console.error("❌ Socket Error:", error.message);
+        socket.emit("error", "Socket failed");
       }
     });
 
-    // 🔥 DISCONNECT
+    /// 🔥 DISCONNECT
     socket.on("disconnect", () => {
       console.log("❌ Disconnected:", socket.id);
-
-      // 🧹 cleanup mapping
-      for (const userId in users) {
-        if (users[userId] === socket.id) {
-          delete users[userId];
-          break;
-        }
-      }
     });
   });
 };

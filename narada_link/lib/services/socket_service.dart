@@ -15,6 +15,7 @@ class SocketService {
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
+          .enableReconnection() // 🔥 auto reconnect
           .setExtraHeaders(
             token != null ? {"Authorization": "Bearer $token"} : {},
           )
@@ -24,8 +25,13 @@ class SocketService {
     socket!.onConnect((_) {
       print("🟢 Socket Connected");
 
-      // 🔥 register user
-      socket!.emit("join", userId);
+      socket!.emit("join", userId.toString());
+    });
+
+    /// 🔁 reconnect pe bhi join karo
+    socket!.onReconnect((_) {
+      print("🔁 Socket Reconnected");
+      socket!.emit("join", userId.toString());
     });
 
     socket!.onDisconnect((_) {
@@ -41,30 +47,35 @@ class SocketService {
     });
   }
 
-  /// 💬 SEND MESSAGE (MATCH BACKEND)
+  /// 💬 SEND MESSAGE
   void sendMessage(Map<String, dynamic> data) {
-    if (socket != null && socket!.connected) {
-      socket!.emit("send_message", data); // 🔥 FIXED
+    if (socket?.connected ?? false) {
+      socket!.emit("send_message", data);
     } else {
       print("⚠️ Socket not connected");
     }
   }
 
-  /// 📥 RECEIVE MESSAGE
+  /// 📥 RECEIVE MESSAGE (SAFE LISTENER)
   void onMessage(Function(dynamic) callback) {
+    socket?.off("receive_message"); // 🔥 prevent duplicate listener
+
     socket?.on("receive_message", (data) {
       callback(data);
     });
   }
 
-  /// ✍️ TYPING (optional future use)
-  void sendTyping(String receiverId) {
+  /// ✍️ TYPING
+  void sendTyping(String senderId, String receiverId) {
     socket?.emit("typing", {
+      "senderId": senderId,
       "receiverId": receiverId,
     });
   }
 
   void onTyping(Function(dynamic) callback) {
+    socket?.off("typing");
+
     socket?.on("typing", (data) {
       callback(data);
     });
@@ -72,6 +83,8 @@ class SocketService {
 
   /// 🔌 DISCONNECT
   void disconnect() {
+    socket?.off("receive_message");
+    socket?.off("typing");
     socket?.disconnect();
     socket?.dispose();
     socket = null;
