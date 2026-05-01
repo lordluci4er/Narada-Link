@@ -5,12 +5,23 @@ import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/username_screen.dart';
-import 'screens/main_screen.dart'; // 🔥 ADD THIS
+import 'screens/main_screen.dart';
 import 'utils/colors.dart';
+
+// 🔥 NEW IMPORT
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔥 Firebase init
   await Firebase.initializeApp();
+
+  // 🔥 FCM INIT
+  final fcmToken = await NotificationService.init();
+  NotificationService.listen();
+
+  print("🔥 FCM TOKEN (main): $fcmToken");
 
   runApp(
     ChangeNotifierProvider(
@@ -59,14 +70,12 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // ❌ ROUTES REMOVED (no longer needed)
-
       home: const AuthWrapper(),
     );
   }
 }
 
-/// 🔥 Auth Wrapper (Smart Routing)
+/// 🔥 Auth Wrapper
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -85,6 +94,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> checkLogin() async {
     await Provider.of<AuthProvider>(context, listen: false).checkLogin();
+
     setState(() {
       isLoading = false;
     });
@@ -94,7 +104,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
 
-    // 🔄 Loading Screen
+    // 🔄 Loading
     if (isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -106,9 +116,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // 🔥 FINAL FLOW (IMPORTANT ORDER)
+    // 🔥 FINAL FLOW
     if (auth.isLoggedIn && auth.token != null) {
-      return MainScreen(jwt: auth.token!); // ✅ MAIN NAVIGATION ENTRY
+      return MainScreen(jwt: auth.token!);
     }
 
     if (auth.needsUsername && auth.token != null) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_bottom_nav.dart';
+import '../services/api_service.dart';
+
 import 'home_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
@@ -15,21 +17,57 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int currentIndex = 0;
 
-  late final List<Widget> screens;
+  List<Widget> screens = [];
+  String? myId;
+  bool loading = true;
 
   @override
   void initState() {
     super.initState();
+    initUser();
+  }
 
-    screens = [
-      HomeScreen(jwt: widget.jwt), // 🔥 FIXED (IMPORTANT)
-      SearchScreen(jwt: widget.jwt),
-      ProfileScreen(jwt: widget.jwt),
-    ];
+  /// 🔥 GET CURRENT USER ID
+  Future<void> initUser() async {
+    try {
+      final user = await ApiService.getMe(widget.jwt);
+
+      if (user != null && user['_id'] != null) {
+        myId = user['_id'];
+
+        // 🔥 IMPORTANT FIX
+        screens = [
+          HomeScreen(
+            jwt: widget.jwt,
+            myId: myId!, // ✅ FIXED
+          ),
+          SearchScreen(
+            jwt: widget.jwt,
+            myId: myId!,
+          ),
+          ProfileScreen(jwt: widget.jwt),
+        ];
+      } else {
+        print("❌ Failed to fetch user or missing _id");
+      }
+    } catch (e) {
+      print("🔥 initUser error: $e");
+    }
+
+    setState(() {
+      loading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    /// 🔄 Loading state
+    if (loading || screens.isEmpty) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: currentIndex,

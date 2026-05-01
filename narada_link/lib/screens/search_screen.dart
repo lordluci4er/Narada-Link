@@ -5,7 +5,13 @@ import 'chat_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final String jwt;
-  const SearchScreen({super.key, required this.jwt});
+  final String myId; // 🔥 ADD THIS
+
+  const SearchScreen({
+    super.key,
+    required this.jwt,
+    required this.myId,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -17,7 +23,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool loading = false;
 
   void searchUsers(String query) async {
-    if (query.isEmpty) {
+    if (query.trim().isEmpty) {
       setState(() => users = []);
       return;
     }
@@ -45,7 +51,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
       body: Column(
         children: [
-          // 🔥 Search Bar
+          // 🔍 Search Bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -60,19 +66,22 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
 
-          // 🔥 Loading
+          // 🔄 Loading
           if (loading)
-            const Center(
+            const Padding(
+              padding: EdgeInsets.only(top: 20),
               child: CircularProgressIndicator(),
             ),
 
-          // 🔥 Results
+          // 📋 Results
           Expanded(
             child: users.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      "No users found",
-                      style: TextStyle(color: AppColors.secondary),
+                      controller.text.isEmpty
+                          ? "Start typing to find users"
+                          : "No users found",
+                      style: const TextStyle(color: AppColors.secondary),
                     ),
                   )
                 : ListView.builder(
@@ -81,26 +90,45 @@ class _SearchScreenState extends State<SearchScreen> {
                       final user = users[index];
 
                       return ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+
                         leading: CircleAvatar(
+                          backgroundColor: AppColors.card,
                           backgroundImage:
-                              NetworkImage(user['avatar'] ?? ""),
+                              (user['avatar'] != null &&
+                                      user['avatar'].toString().isNotEmpty)
+                                  ? NetworkImage(user['avatar'])
+                                  : null,
+                          child: (user['avatar'] == null ||
+                                  user['avatar'].toString().isEmpty)
+                              ? const Icon(Icons.person,
+                                  color: AppColors.primary)
+                              : null,
                         ),
+
                         title: Text(
                           user['username'] ?? "",
                           style:
                               const TextStyle(color: AppColors.primary),
                         ),
+
                         subtitle: Text(
                           user['email'] ?? "",
                           style:
                               const TextStyle(color: AppColors.secondary),
                         ),
+
                         onTap: () {
-                          // 🔥 Open Chat
+                          // 🔥 FIXED: REAL CHAT OPEN
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ChatScreen(),
+                              builder: (_) => ChatScreen(
+                                jwt: widget.jwt,
+                                userId: user['_id'],     // 🔥 selected user
+                                myId: widget.myId,       // 🔥 current user
+                              ),
                             ),
                           );
                         },

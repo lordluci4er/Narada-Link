@@ -5,7 +5,7 @@ class SocketService {
 
   final String baseUrl = "https://narada-link.onrender.com";
 
-  /// 🔌 Connect with userId + JWT
+  /// 🔌 CONNECT SOCKET
   void connect({
     required String userId,
     String? token,
@@ -22,17 +22,18 @@ class SocketService {
     );
 
     socket!.onConnect((_) {
-      print("🟢 Connected to socket");
+      print("🟢 Socket Connected");
 
+      // 🔥 register user
       socket!.emit("join", userId);
     });
 
     socket!.onDisconnect((_) {
-      print("🔴 Disconnected from socket");
+      print("🔴 Socket Disconnected");
     });
 
     socket!.onConnectError((err) {
-      print("❌ Connection Error: $err");
+      print("❌ Connect Error: $err");
     });
 
     socket!.onError((err) {
@@ -40,30 +41,36 @@ class SocketService {
     });
   }
 
-  /// 💬 Send message
+  /// 💬 SEND MESSAGE (MATCH BACKEND)
   void sendMessage(Map<String, dynamic> data) {
     if (socket != null && socket!.connected) {
-      socket!.emit("send_message", data);
+      socket!.emit("send_message", data); // 🔥 FIXED
     } else {
       print("⚠️ Socket not connected");
     }
   }
 
-  /// 📥 Listen messages
+  /// 📥 RECEIVE MESSAGE
   void onMessage(Function(dynamic) callback) {
-    socket?.on("receive_message", callback);
+    socket?.on("receive_message", (data) {
+      callback(data);
+    });
   }
 
-  /// ✍️ Typing
+  /// ✍️ TYPING (optional future use)
   void sendTyping(String receiverId) {
-    socket?.emit("typing", {"receiverId": receiverId});
+    socket?.emit("typing", {
+      "receiverId": receiverId,
+    });
   }
 
   void onTyping(Function(dynamic) callback) {
-    socket?.on("typing", callback);
+    socket?.on("typing", (data) {
+      callback(data);
+    });
   }
 
-  /// 🔌 Disconnect
+  /// 🔌 DISCONNECT
   void disconnect() {
     socket?.disconnect();
     socket?.dispose();

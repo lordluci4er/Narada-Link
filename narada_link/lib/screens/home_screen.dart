@@ -4,10 +4,16 @@ import 'chat_screen.dart';
 import 'search_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  final String jwt; // 🔥 ADD THIS
-  final List<Map<String, dynamic>> chats = [];
+  final String jwt;
+  final String myId; // 🔥 ADD THIS (IMPORTANT)
 
-  HomeScreen({super.key, required this.jwt});
+  final List<Map<String, dynamic>> chats = []; // 🔥 dummy (later API se ayega)
+
+  HomeScreen({
+    super.key,
+    required this.jwt,
+    required this.myId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +23,7 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🔥 Header
+          /// 🔥 Header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
             child: Row(
@@ -29,9 +35,9 @@ class HomeScreen extends StatelessWidget {
                     color: AppColors.primary,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
                   ),
                 ),
+
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -48,7 +54,7 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
 
-          // 🔥 Subtitle
+          /// 🔥 Subtitle
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -62,6 +68,7 @@ class HomeScreen extends StatelessWidget {
 
           const SizedBox(height: 10),
 
+          /// 🔥 Content
           Expanded(
             child: isEmpty ? _emptyState(context) : _chatList(context),
           ),
@@ -118,13 +125,16 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            // 🔥 FIXED BUTTON
+            /// 🔥 FIXED BUTTON (myId pass)
             GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SearchScreen(jwt: jwt), // 🔥 FIXED
+                    builder: (_) => SearchScreen(
+                      jwt: jwt,
+                      myId: myId, // 🔥 FIXED
+                    ),
                   ),
                 );
               },
@@ -166,7 +176,11 @@ class HomeScreen extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const ChatScreen(),
+                builder: (_) => ChatScreen(
+                  jwt: jwt,
+                  userId: chat['userId'], // 🔥 important
+                  myId: myId,
+                ),
               ),
             );
           },

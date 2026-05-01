@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import { validateUsername } from "../utils/validators.js";
 
-// 🔥 Set Username
+/// 🔥 SET USERNAME
 export const setUsername = async (req, res) => {
   try {
     const { username } = req.body;
@@ -17,7 +17,7 @@ export const setUsername = async (req, res) => {
       return res.status(400).json({ msg: error });
     }
 
-    // 🔥 SAFE user id handling
+    // 🔥 SAFE USER ID
     const userId = req.user?.id || req.user;
 
     const currentUser = await User.findById(userId);
@@ -25,16 +25,18 @@ export const setUsername = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
+    // ❌ prevent change
     if (currentUser.username) {
       return res.status(400).json({
-        msg: "Username already set. Cannot change."
+        msg: "Username already set. Cannot change.",
       });
     }
 
+    // 🔥 ATOMIC UPDATE
     const updated = await User.findOneAndUpdate(
       {
         _id: userId,
-        username: { $in: [null, ""] }
+        username: { $in: [null, ""] },
       },
       { $set: { username: clean } },
       { new: true }
@@ -42,7 +44,7 @@ export const setUsername = async (req, res) => {
 
     if (!updated) {
       return res.status(400).json({
-        msg: "Username already set or conflict occurred"
+        msg: "Username already set or conflict occurred",
       });
     }
 
@@ -55,7 +57,7 @@ export const setUsername = async (req, res) => {
 };
 
 
-// 🔍 Search Users (🔥 FIXED VERSION)
+/// 🔍 SEARCH USERS (SELF EXCLUDED)
 export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
@@ -66,14 +68,13 @@ export const searchUsers = async (req, res) => {
 
     const clean = username.toLowerCase().trim();
 
-    // 🔥 SAFE user id
     const userId = req.user?.id || req.user;
 
     const users = await User.find({
       username: { $regex: clean, $options: "i" },
 
-      // 🔥 MOST IMPORTANT FIX
-      _id: { $ne: userId }, // ❌ exclude self
+      // 🔥 IMPORTANT: self remove
+      _id: { $ne: userId },
     })
       .select("username avatar email")
       .limit(20);
@@ -87,7 +88,7 @@ export const searchUsers = async (req, res) => {
 };
 
 
-// 👤 GET CURRENT USER (PROFILE)
+/// 👤 GET CURRENT USER
 export const getMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -103,5 +104,30 @@ export const getMe = async (req, res) => {
   } catch (error) {
     console.log("❌ getMe error:", error.message);
     res.status(500).json({ msg: "Server error" });
+  }
+};
+
+
+/// 🔔 SAVE FCM TOKEN (🔥 PUSH NOTIFICATION CORE)
+export const saveFcmToken = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user;
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ msg: "FCM token required" });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      fcmToken: token,
+    });
+
+    console.log("🔔 FCM token saved for user:", userId);
+
+    res.json({ msg: "Token saved" });
+
+  } catch (err) {
+    console.error("FCM Save Error:", err);
+    res.status(500).json({ msg: "Error saving token" });
   }
 };
