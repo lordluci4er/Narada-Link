@@ -5,15 +5,15 @@ import admin from "../config/firebaseAdmin.js";
 /// 🔥 SEND MESSAGE + PUSH NOTIFICATION
 export const sendMessage = async (req, res) => {
   try {
-    // 🔥 SAFE USER ID
-    const senderId = req.user?.id || req.user;
+    // 🔥 SAFE USER ID (always string)
+    const senderId = (req.user?.id || req.user).toString();
     const { receiverId, text } = req.body;
 
     if (!receiverId || !text) {
       return res.status(400).json({ msg: "Missing fields" });
     }
 
-    // 💾 Save message in DB
+    // 💾 Save message
     const message = await Message.create({
       senderId,
       receiverId,
@@ -33,7 +33,7 @@ export const sendMessage = async (req, res) => {
             body: text,
           },
           data: {
-            senderId: String(senderId),   // 🔥 important for navigation
+            senderId: String(senderId),
             receiverId: String(receiverId),
             type: "chat",
           },
@@ -46,7 +46,12 @@ export const sendMessage = async (req, res) => {
       }
     }
 
-    res.status(201).json(message);
+    // ✅ RESPONSE WITH STRING IDS
+    res.status(201).json({
+      ...message.toObject(),
+      senderId: message.senderId.toString(),
+      receiverId: message.receiverId.toString(),
+    });
 
   } catch (error) {
     console.error("Send Message Error:", error);
@@ -58,7 +63,7 @@ export const sendMessage = async (req, res) => {
 /// 🔥 GET MESSAGES
 export const getMessages = async (req, res) => {
   try {
-    const myId = req.user?.id || req.user;
+    const myId = (req.user?.id || req.user).toString();
     const userId = req.params.userId;
 
     const messages = await Message.find({
@@ -68,7 +73,14 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    res.json(messages);
+    // ✅ FORMAT ALL IDS TO STRING
+    const formattedMessages = messages.map((m) => ({
+      ...m.toObject(),
+      senderId: m.senderId.toString(),
+      receiverId: m.receiverId.toString(),
+    }));
+
+    res.json(formattedMessages);
 
   } catch (error) {
     console.error("Get Messages Error:", error);

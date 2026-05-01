@@ -6,8 +6,8 @@ import '../widgets/message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
   final String jwt;
-  final String userId; // 🔥 receiver
-  final String myId;   // 🔥 current user
+  final String userId;
+  final String myId;
 
   const ChatScreen({
     super.key,
@@ -31,22 +31,32 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-
     loadMessages();
 
-    // 🔥 SOCKET CONNECT
     socket.connect(userId: widget.myId);
 
-    // 🔥 RECEIVE REALTIME MESSAGE
     socket.onMessage((data) {
-      // ❗ duplicate avoid (optional basic check)
-      if (data['senderId'] == widget.userId) {
-        setState(() {
-          messages.add(data);
-        });
+      final senderId = data['senderId'].toString();
+      final receiverId = data['receiverId'].toString();
 
-        scrollToBottom();
-      }
+      // ✅ Only accept messages of THIS chat
+      final isThisChat =
+          (senderId == widget.userId && receiverId == widget.myId);
+
+      if (!isThisChat) return;
+
+      // ✅ Prevent duplicate (IMPORTANT)
+      final alreadyExists = messages.any((m) =>
+          m['text'] == data['text'] &&
+          m['senderId'].toString() == senderId);
+
+      if (alreadyExists) return;
+
+      setState(() {
+        messages.add(data);
+      });
+
+      scrollToBottom();
     });
   }
 
@@ -74,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// 🔥 AUTO SCROLL
   void scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
@@ -85,27 +95,28 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SEND MESSAGE (REALTIME + DB)
+  /// 🔥 SEND MESSAGE
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
 
     final msg = {
-      "senderId": widget.myId,
-      "receiverId": widget.userId,
+      "senderId": widget.myId.toString(),
+      "receiverId": widget.userId.toString(),
       "text": text,
+      "local": true, // 🔥 mark as local
     };
 
-    // 🔥 realtime send
-    socket.sendMessage(msg);
-
-    // 🔥 optimistic UI
+    // ✅ Optimistic UI
     setState(() {
       messages.add(msg);
     });
 
     controller.clear();
     scrollToBottom();
+
+    // 🔥 realtime send
+    socket.sendMessage(msg);
 
     // 🔥 save in DB
     final success = await ApiService.sendMessage(
@@ -141,14 +152,11 @@ class _ChatScreenState extends State<ChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            /// 🔄 LOADING
             if (loading)
               const Expanded(
                 child: Center(child: CircularProgressIndicator()),
               )
             else
-
-              /// 💬 MESSAGE LIST
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
@@ -157,7 +165,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final m = messages[index];
 
-                    final isMe = m['senderId'] == widget.myId;
+                    final isMe =
+                        m['senderId'].toString() == widget.myId.toString();
 
                     return MessageBubble(
                       text: m['text'] ?? "",
@@ -167,9 +176,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
 
-            /// ✍️ INPUT BOX
+            /// ✍️ INPUT
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
