@@ -9,32 +9,67 @@ class AuthProvider extends ChangeNotifier {
 
   /// 🔐 Login
   Future<void> login() async {
-    final response = await _authService.signInWithGoogle();
+    try {
+      print("🚀 Starting login process...");
 
-    if (response != null) {
-      token = response['token']; // JWT
-      isLoggedIn = true;
-      notifyListeners();
+      final response = await _authService.signInWithGoogle();
+
+      print("📡 Login response: $response");
+
+      if (response != null && response['token'] != null) {
+        token = response['token'];
+
+        print("🔐 JWT stored: $token");
+
+        isLoggedIn = true;
+        notifyListeners();
+
+        print("✅ Login successful → HomeScreen");
+      } else {
+        print("❌ Login failed: Response null or token missing");
+      }
+    } catch (e) {
+      print("🔥 Login Provider Error: $e");
     }
   }
 
   /// 🔁 Auto Login (app start pe)
   Future<void> checkLogin() async {
-    final savedToken = await _authService.getToken();
+    try {
+      print("🔁 Checking saved login...");
 
-    if (savedToken != null) {
-      token = savedToken;
-      isLoggedIn = true;
-      notifyListeners();
+      final savedToken = await _authService.getToken();
+
+      print("📦 Saved token: $savedToken");
+
+      if (savedToken != null) {
+        token = savedToken;
+        isLoggedIn = true;
+        notifyListeners();
+
+        print("✅ Auto login success");
+      } else {
+        print("⚠️ No saved token found");
+      }
+    } catch (e) {
+      print("🔥 Auto login error: $e");
     }
   }
 
   /// 🔓 Logout
   Future<void> logout() async {
-    await _authService.logout();
+    try {
+      print("🚪 Logging out...");
 
-    token = null;
-    isLoggedIn = false;
-    notifyListeners();
+      await _authService.logout();
+
+      token = null;
+      isLoggedIn = false;
+      notifyListeners();
+
+      print("✅ Logout successful");
+    } catch (e) {
+      print("🔥 Logout error: $e");
+    }
   }
 }

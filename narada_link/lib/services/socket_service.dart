@@ -3,9 +3,9 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 class SocketService {
   IO.Socket? socket;
 
-  final String baseUrl = "http://192.168.1.5:5000";
+  final String baseUrl = "https://narada-link.onrender.com";
 
-  /// 🔌 Connect with userId + JWT (recommended)
+  /// 🔌 Connect with userId + JWT
   void connect({
     required String userId,
     String? token,
@@ -24,7 +24,6 @@ class SocketService {
     socket!.onConnect((_) {
       print("🟢 Connected to socket");
 
-      // join personal room
       socket!.emit("join", userId);
     });
 
@@ -34,6 +33,10 @@ class SocketService {
 
     socket!.onConnectError((err) {
       print("❌ Connection Error: $err");
+    });
+
+    socket!.onError((err) {
+      print("❌ Socket Error: $err");
     });
   }
 
@@ -51,14 +54,13 @@ class SocketService {
     socket?.on("receive_message", callback);
   }
 
-  /// 🧠 Listen typing (future use)
-  void onTyping(Function(dynamic) callback) {
-    socket?.on("typing", callback);
-  }
-
-  /// ✍️ Emit typing
+  /// ✍️ Typing
   void sendTyping(String receiverId) {
     socket?.emit("typing", {"receiverId": receiverId});
+  }
+
+  void onTyping(Function(dynamic) callback) {
+    socket?.on("typing", callback);
   }
 
   /// 🔌 Disconnect
