@@ -4,26 +4,21 @@ const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   // 🔍 Check header exists
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ msg: "No token provided" });
   }
 
-  // 🔍 Extract token
-  const token = authHeader.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ msg: "Invalid token format" });
-  }
-
   try {
+    // 🔑 Extract token safely
+    const token = authHeader.split(" ")[1];
+
     // 🔐 Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // ✅ FIX: store full object (NOT just id)
-    req.user = decoded;
-
-    // 🧪 Debug (optional)
-    console.log("✅ Authenticated User:", req.user);
+    // ✅ BEST PRACTICE: normalize user id
+    req.user = {
+      id: decoded.id, // 🔥 consistent everywhere
+    };
 
     next();
   } catch (error) {

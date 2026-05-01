@@ -17,8 +17,8 @@ export const setUsername = async (req, res) => {
       return res.status(400).json({ msg: error });
     }
 
-    // 🔥 FIX: id correctly read
-    const userId = req.user.id || req.user;
+    // 🔥 SAFE user id handling
+    const userId = req.user?.id || req.user;
 
     const currentUser = await User.findById(userId);
     if (!currentUser) {
@@ -55,7 +55,7 @@ export const setUsername = async (req, res) => {
 };
 
 
-// 🔍 Search Users
+// 🔍 Search Users (🔥 FIXED VERSION)
 export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
@@ -66,8 +66,14 @@ export const searchUsers = async (req, res) => {
 
     const clean = username.toLowerCase().trim();
 
+    // 🔥 SAFE user id
+    const userId = req.user?.id || req.user;
+
     const users = await User.find({
-      username: { $regex: clean, $options: "i" }
+      username: { $regex: clean, $options: "i" },
+
+      // 🔥 MOST IMPORTANT FIX
+      _id: { $ne: userId }, // ❌ exclude self
     })
       .select("username avatar email")
       .limit(20);
@@ -84,8 +90,7 @@ export const searchUsers = async (req, res) => {
 // 👤 GET CURRENT USER (PROFILE)
 export const getMe = async (req, res) => {
   try {
-    // 🔥 FIX: same id handling
-    const userId = req.user.id || req.user;
+    const userId = req.user?.id || req.user;
 
     const user = await User.findById(userId).select("-__v");
 
