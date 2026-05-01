@@ -25,7 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final controller = TextEditingController();
   final scrollController = ScrollController();
 
-  List messages = [];
+  List<Map<String, dynamic>> messages = [];
   bool loading = true;
 
   @override
@@ -34,15 +34,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 ALWAYS reload on any incoming message
+    /// 🔥 Always reload on incoming message
     socket.onMessage((data) {
-      loadMessages(); // ✅ simple & stable
+      loadMessages();
     });
 
     loadMessages();
   }
 
-  /// 🔥 LOAD MESSAGES FROM DB
+  /// 🔥 LOAD MESSAGES
   void loadMessages() async {
     try {
       final data = await ApiService.getMessages(
@@ -50,8 +50,11 @@ class _ChatScreenState extends State<ChatScreen> {
         widget.jwt,
       );
 
+      /// ✅ Ensure proper type casting
+      final formatted = List<Map<String, dynamic>>.from(data);
+
       setState(() {
-        messages = data;
+        messages = formatted;
         loading = false;
       });
 
@@ -77,14 +80,13 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SEND MESSAGE (FIXED ORDER)
+  /// 🔥 SEND MESSAGE
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
 
     controller.clear();
 
-    // 🔥 1. SAVE IN DB
     final success = await ApiService.sendMessage(
       widget.userId,
       text,
@@ -96,14 +98,12 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // 🔥 2. SOCKET NOTIFY
     socket.sendMessage({
       "senderId": widget.myId.toString(),
       "receiverId": widget.userId.toString(),
       "text": text,
     });
 
-    // 🔥 3. RELOAD FROM DB
     loadMessages();
   }
 
@@ -113,6 +113,17 @@ class _ChatScreenState extends State<ChatScreen> {
     controller.dispose();
     scrollController.dispose();
     super.dispose();
+  }
+
+  /// 🔥 SAFE TEXT EXTRACTOR (MAIN FIX)
+  String getText(Map<String, dynamic> m) {
+    final val = m['text'];
+
+    if (val == null) return "";
+
+    if (val is String) return val;
+
+    return val.toString();
   }
 
   @override
@@ -146,15 +157,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     final isMe =
                         m['senderId'].toString() == widget.myId.toString();
 
+                    final text = getText(m); // 🔥 FIXED
+
                     return MessageBubble(
-                      text: (m['text'] ?? m['message'] ?? "").toString(),
+                      text: text,
                       isMe: isMe,
                     );
                   },
                 ),
               ),
 
-            /// ✍️ INPUT BOX
+            /// ✍️ INPUT
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

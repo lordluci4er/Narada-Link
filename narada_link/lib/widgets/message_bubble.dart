@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../utils/colors.dart';
 
 class MessageBubble extends StatelessWidget {
   final String text;
@@ -21,7 +20,9 @@ class MessageBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
         constraints: const BoxConstraints(maxWidth: 260),
         decoration: BoxDecoration(
-          color: isMe ? AppColors.primary : AppColors.card,
+          color: isMe
+              ? const Color(0xFF2C2C2C)   // 🔥 dark gray
+              : const Color(0xFFE0E0E0),  // 🔥 light gray
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(14),
             topRight: const Radius.circular(14),
@@ -33,8 +34,8 @@ class MessageBubble extends StatelessWidget {
           text,
           style: TextStyle(
             color: isMe
-                ? AppColors.background
-                : AppColors.primary,
+                ? Colors.white
+                : Colors.black,
             fontSize: 14,
           ),
         ),
