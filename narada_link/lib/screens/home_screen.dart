@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 import '../services/api_service.dart';
+import '../services/socket_service.dart';
 import 'chat_screen.dart';
 import 'search_screen.dart';
 
@@ -19,6 +20,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final socket = SocketService();
+
   List chats = [];
   bool loading = true;
 
@@ -26,11 +29,27 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     loadChats();
+
+    /// 🔥 SOCKET CONNECT
+    socket.connect(userId: widget.myId);
+
+    /// 🔥 REALTIME REFRESH
+    socket.onMessage((_) {
+      loadChats();
+    });
+  }
+
+  @override
+  void dispose() {
+    socket.disconnect();
+    super.dispose();
   }
 
   /// 🔥 LOAD RECENT CHATS
   void loadChats() async {
     final data = await ApiService.getRecentChats(widget.jwt);
+
+    if (!mounted) return;
 
     setState(() {
       chats = data;
@@ -128,9 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.primary,
               ),
             ),
-
             const SizedBox(height: 25),
-
             const Text(
               "No conversations yet",
               textAlign: TextAlign.center,
@@ -140,9 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 8),
-
             const Text(
               "Find people and start your first conversation.",
               textAlign: TextAlign.center,
@@ -151,9 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontSize: 13,
               ),
             ),
-
             const SizedBox(height: 25),
-
             GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -199,8 +212,11 @@ class _HomeScreenState extends State<HomeScreen> {
       itemBuilder: (context, index) {
         final chat = chats[index];
 
-        final userId = chat['_id']; // 🔥 from backend
+        final userId = chat['_id'];
         final lastMessage = chat['lastMessage'] ?? "";
+
+        final isMe =
+            chat['senderId'].toString() == widget.myId.toString();
 
         return GestureDetector(
           onTap: () {
@@ -213,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   myId: widget.myId,
                 ),
               ),
-            );
+            ).then((_) => loadChats());
           },
           child: Container(
             padding: const EdgeInsets.all(14),
@@ -231,15 +247,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(color: AppColors.primary),
                   ),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        userId, // 🔥 for now (later name fetch karenge)
+                        userId,
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -247,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        lastMessage,
+                        isMe ? "You: $lastMessage" : lastMessage,
                         style: const TextStyle(
                           color: AppColors.secondary,
                           fontSize: 12,

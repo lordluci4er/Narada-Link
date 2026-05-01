@@ -3,18 +3,21 @@ import protect from "../middleware/authMiddleware.js";
 import {
   sendMessage,
   getMessages,
-  getRecentChats, // 🔥 added
+  getRecentChats,
 } from "../controllers/messageController.js";
 
 const router = express.Router();
 
-// 🔥 SEND MESSAGE
+/// 🔥 SEND MESSAGE
+// POST /api/messages
 router.post("/", protect, sendMessage);
 
-// 🔥 GET RECENT CHATS (⚠️ ALWAYS keep above /:userId)
+/// 🔥 GET RECENT CHATS (⚠️ must be before :userId)
+// GET /api/messages/recent
 router.get("/recent", protect, getRecentChats);
 
-// 🔥 GET ALL MESSAGES (chat between 2 users)
+/// 🔥 GET CHAT BETWEEN TWO USERS
+// GET /api/messages/:userId
 router.get("/:userId", protect, getMessages);
 
 export default router;

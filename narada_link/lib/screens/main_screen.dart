@@ -8,7 +8,11 @@ import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final String jwt;
-  const MainScreen({super.key, required this.jwt});
+
+  const MainScreen({
+    super.key,
+    required this.jwt,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -29,29 +33,23 @@ class _MainScreenState extends State<MainScreen> {
 
   /// 🔥 GET CURRENT USER ID
   Future<void> initUser() async {
-    try {
-      final user = await ApiService.getMe(widget.jwt);
+    final user = await ApiService.getMe(widget.jwt);
 
-      if (user != null && user['_id'] != null) {
-        myId = user['_id'];
+    if (user != null && user['_id'] != null) {
+      myId = user['_id'].toString();
 
-        // 🔥 IMPORTANT FIX
-        screens = [
-          HomeScreen(
-            jwt: widget.jwt,
-            myId: myId!, // ✅ FIXED
-          ),
-          SearchScreen(
-            jwt: widget.jwt,
-            myId: myId!,
-          ),
-          ProfileScreen(jwt: widget.jwt),
-        ];
-      } else {
-        print("❌ Failed to fetch user or missing _id");
-      }
-    } catch (e) {
-      print("🔥 initUser error: $e");
+      /// 🔥 SCREENS INIT (myId PASS)
+      screens = [
+        HomeScreen(
+          jwt: widget.jwt,
+          myId: myId!, // ✅ IMPORTANT
+        ),
+        SearchScreen(
+          jwt: widget.jwt,
+          myId: myId!,
+        ),
+        ProfileScreen(jwt: widget.jwt),
+      ];
     }
 
     setState(() {
@@ -61,7 +59,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    /// 🔄 Loading state
+    /// 🔄 LOADING STATE
     if (loading || screens.isEmpty) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),

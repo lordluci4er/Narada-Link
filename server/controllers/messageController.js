@@ -100,6 +100,7 @@ export const getRecentChats = async (req, res) => {
           ],
         },
       },
+
       { $sort: { createdAt: -1 } },
 
       {
@@ -119,6 +120,7 @@ export const getRecentChats = async (req, res) => {
           _id: "$chatUser",
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
+          senderId: { $first: "$senderId" }, // 🔥 added
         },
       },
 
