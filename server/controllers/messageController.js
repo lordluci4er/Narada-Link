@@ -37,25 +37,22 @@ export const sendMessage = async (req, res) => {
             type: "chat",
           },
         });
-      } catch (err) {
-        console.log("⚠️ FCM error:", err.message);
-      }
+      } catch (err) {}
     }
 
     res.status(201).json({
       ...message.toObject(),
-      senderId: message.senderId.toString(),
-      receiverId: message.receiverId.toString(),
+      senderId,
+      receiverId: receiverIdStr,
     });
 
   } catch (error) {
-    console.error("Send Message Error:", error);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
 
-/// 🔥 GET ALL MESSAGES (CHAT)
+/// 🔥 GET ALL MESSAGES
 export const getMessages = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -68,22 +65,15 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    const formatted = messages.map((m) => ({
-      ...m.toObject(),
-      senderId: m.senderId.toString(),
-      receiverId: m.receiverId.toString(),
-    }));
-
-    res.json(formatted);
+    res.json(messages);
 
   } catch (error) {
-    console.error("Get Messages Error:", error);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
 
-/// 🔥 GET RECENT CHATS (BASIC LIST)
+/// 🔥 GET RECENT CHATS (WORKING)
 export const getRecentChats = async (req, res) => {
   try {
     const userId = (req.user?.id || req.user).toString();
@@ -115,8 +105,8 @@ export const getRecentChats = async (req, res) => {
         $group: {
           _id: "$chatUser",
           lastMessage: { $first: "$text" },
-          createdAt: { $first: "$createdAt" },
           senderId: { $first: "$senderId" },
+          createdAt: { $first: "$createdAt" },
         },
       },
 
@@ -126,18 +116,17 @@ export const getRecentChats = async (req, res) => {
     res.json(chats);
 
   } catch (err) {
-    console.error("Recent Chats Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
 
-/// 🔥 GET CONVERSATIONS (WITH USER DETAILS)
+/// 🔥 GET CONVERSATIONS (🔥 FINAL FIXED VERSION)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
 
-    const messages = await Message.aggregate([
+    const conversations = await Message.aggregate([
       {
         $match: {
           $or: [
@@ -170,11 +159,18 @@ export const getConversations = async (req, res) => {
         },
       },
 
-      /// 🔥 JOIN USER DATA
+      /// 🔥 FIX: convert string → ObjectId
+      {
+        $addFields: {
+          userObjectId: { $toObjectId: "$_id" },
+        },
+      },
+
+      /// 🔥 JOIN USERS (NOW WORKS)
       {
         $lookup: {
           from: "users",
-          localField: "_id",
+          localField: "userObjectId",
           foreignField: "_id",
           as: "user",
         },
@@ -182,7 +178,6 @@ export const getConversations = async (req, res) => {
 
       { $unwind: "$user" },
 
-      /// 🔥 FINAL SHAPE
       {
         $project: {
           userId: "$_id",
@@ -197,10 +192,10 @@ export const getConversations = async (req, res) => {
       { $sort: { createdAt: -1 } },
     ]);
 
-    res.json(messages);
+    res.json(conversations);
 
   } catch (err) {
-    console.error("Conversations Error:", err);
+    console.error(err);
     res.status(500).json({ msg: "Server error" });
   }
 };
