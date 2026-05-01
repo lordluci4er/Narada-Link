@@ -49,13 +49,13 @@ export const sendMessage = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Send Message Error:", error);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
 
-/// 🔥 GET MESSAGES
+/// 🔥 GET ALL MESSAGES (CHAT)
 export const getMessages = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -80,7 +80,55 @@ export const getMessages = async (req, res) => {
     res.json(formatted);
 
   } catch (error) {
-    console.error(error);
+    console.error("Get Messages Error:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+
+/// 🔥 GET RECENT CHATS (CHAT LIST)
+export const getRecentChats = async (req, res) => {
+  try {
+    const userId = (req.user?.id || req.user).toString();
+
+    const chats = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+
+      {
+        $addFields: {
+          chatUser: {
+            $cond: [
+              { $eq: ["$senderId", userId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+        },
+      },
+
+      {
+        $group: {
+          _id: "$chatUser",
+          lastMessage: { $first: "$text" },
+          createdAt: { $first: "$createdAt" },
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    res.json(chats);
+
+  } catch (err) {
+    console.error("Recent Chats Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };

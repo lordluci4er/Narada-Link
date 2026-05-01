@@ -1,78 +1,107 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import '../services/api_service.dart';
 import 'chat_screen.dart';
 import 'search_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final String jwt;
-  final String myId; // 🔥 ADD THIS (IMPORTANT)
+  final String myId;
 
-  final List<Map<String, dynamic>> chats = []; // 🔥 dummy (later API se ayega)
-
-  HomeScreen({
+  const HomeScreen({
     super.key,
     required this.jwt,
     required this.myId,
   });
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List chats = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadChats();
+  }
+
+  /// 🔥 LOAD RECENT CHATS
+  void loadChats() async {
+    final data = await ApiService.getRecentChats(widget.jwt);
+
+    setState(() {
+      chats = data;
+      loading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isEmpty = chats.isEmpty;
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// 🔥 Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Narada Link",
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            /// 🔥 HEADER
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Narada Link",
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.edit_rounded,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
-                )
-              ],
-            ),
-          ),
-
-          /// 🔥 Subtitle
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              "Recent conversations",
-              style: TextStyle(
-                color: AppColors.secondary,
-                fontSize: 13,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.edit_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  )
+                ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 10),
+            /// 🔥 SUBTITLE
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                "Recent conversations",
+                style: TextStyle(
+                  color: AppColors.secondary,
+                  fontSize: 13,
+                ),
+              ),
+            ),
 
-          /// 🔥 Content
-          Expanded(
-            child: isEmpty ? _emptyState(context) : _chatList(context),
-          ),
-        ],
+            const SizedBox(height: 10),
+
+            /// 🔥 CONTENT
+            Expanded(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : isEmpty
+                      ? _emptyState(context)
+                      : _chatList(context),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -102,7 +131,7 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            Text(
+            const Text(
               "No conversations yet",
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -114,7 +143,7 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            Text(
+            const Text(
               "Find people and start your first conversation.",
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -125,15 +154,14 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            /// 🔥 FIXED BUTTON (myId pass)
             GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => SearchScreen(
-                      jwt: jwt,
-                      myId: myId, // 🔥 FIXED
+                      jwt: widget.jwt,
+                      myId: widget.myId,
                     ),
                   ),
                 );
@@ -171,15 +199,18 @@ class HomeScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final chat = chats[index];
 
+        final userId = chat['_id']; // 🔥 from backend
+        final lastMessage = chat['lastMessage'] ?? "";
+
         return GestureDetector(
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ChatScreen(
-                  jwt: jwt,
-                  userId: chat['userId'], // 🔥 important
-                  myId: myId,
+                  jwt: widget.jwt,
+                  userId: userId,
+                  myId: widget.myId,
                 ),
               ),
             );
@@ -196,7 +227,7 @@ class HomeScreen extends StatelessWidget {
                   radius: 22,
                   backgroundColor: AppColors.input,
                   child: Text(
-                    chat['name'][0].toUpperCase(),
+                    userId.toString()[0].toUpperCase(),
                     style: const TextStyle(color: AppColors.primary),
                   ),
                 ),
@@ -208,7 +239,7 @@ class HomeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        chat['name'],
+                        userId, // 🔥 for now (later name fetch karenge)
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -216,7 +247,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        chat['lastMessage'],
+                        lastMessage,
                         style: const TextStyle(
                           color: AppColors.secondary,
                           fontSize: 12,
@@ -224,14 +255,6 @@ class HomeScreen extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ),
-                ),
-
-                Text(
-                  chat['time'],
-                  style: const TextStyle(
-                    color: AppColors.secondary,
-                    fontSize: 11,
                   ),
                 ),
               ],
