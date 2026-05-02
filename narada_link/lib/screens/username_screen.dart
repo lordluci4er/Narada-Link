@@ -49,7 +49,8 @@ class _UsernameScreenState extends State<UsernameScreen> {
     }
 
     if (username.length < 3) {
-      setState(() => error = "Username must be at least 3 characters");
+      setState(() =>
+          error = "Username must be at least 3 characters");
       return;
     }
 
@@ -58,12 +59,12 @@ class _UsernameScreenState extends State<UsernameScreen> {
       error = "";
     });
 
-    /// 🔥 API CALLS
-    final nameSuccess =
-        await ApiService.setName(name, widget.jwt);
-
-    final userRes =
-        await ApiService.setUsername(username, widget.jwt);
+    /// 🔥 SINGLE API CALL (FIXED)
+    final res = await ApiService.setUsername(
+      name,
+      username,
+      widget.jwt,
+    );
 
     if (!mounted) return;
 
@@ -72,7 +73,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
     });
 
     /// ✅ SUCCESS
-    if (nameSuccess && userRes != null) {
+    if (res != null && res['user'] != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -81,7 +82,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
       );
     } else {
       setState(() {
-        error = "Username taken or something went wrong";
+        error = "Username already taken or invalid";
       });
     }
   }
@@ -159,13 +160,15 @@ class _UsernameScreenState extends State<UsernameScreen> {
               child: ElevatedButton(
                 onPressed: loading ? null : submit,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: loading
                     ? const SizedBox(
                         height: 18,
                         width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child:
+                            CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text("Continue"),
               ),

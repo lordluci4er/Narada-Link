@@ -1,52 +1,72 @@
 import User from "../models/User.js";
 import { validateUsername } from "../utils/validators.js";
 
-/// 🔥 SET USERNAME
+/// 🔥 SET USERNAME + NAME (MERGED)
 export const setUsername = async (req, res) => {
   try {
-    const { username } = req.body;
-
-    if (!username) {
-      return res.status(400).json({ msg: "Username required" });
-    }
-
-    const clean = username.toLowerCase().trim();
-
-    const error = validateUsername ? validateUsername(clean) : null;
-    if (error) {
-      return res.status(400).json({ msg: error });
-    }
-
     const userId = req.user?.id || req.user;
+    const { name, username } = req.body;
 
-    const currentUser = await User.findById(userId);
-    if (!currentUser) {
+    const user = await User.findById(userId);
+
+    if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    /// ❌ prevent change
-    if (currentUser.username) {
-      return res.status(400).json({
-        msg: "Username already set. Cannot change.",
-      });
+    /// 🔥 NAME UPDATE (OPTIONAL)
+    if (name && name.trim().length >= 2) {
+      user.name = name.trim();
     }
 
-    const updated = await User.findOneAndUpdate(
-      {
-        _id: userId,
-        username: { $in: [null, ""] },
+    /// 🔥 USERNAME UPDATE (STRICT)
+    if (username) {
+      const clean = username.toLowerCase().trim();
+
+      const error = validateUsername
+        ? validateUsername(clean)
+        : null;
+
+      if (error) {
+        return res.status(400).json({ msg: error });
+      }
+
+      /// ❌ prevent change
+      if (user.username) {
+        return res.status(400).json({
+          msg: "Username already set. Cannot change.",
+        });
+      }
+
+      /// 🔥 UNIQUE CHECK
+      const exists = await User.findOne({ username: clean });
+
+      if (exists) {
+        return res.status(400).json({
+          msg: "Username already taken",
+        });
+      }
+
+      user.username = clean;
+    }
+
+    await user.save();
+
+    /// 🔥 SOCKET EMIT (NAME UPDATE)
+    const io = req.app.get("io");
+
+    io.to(userId.toString()).emit("userUpdated", {
+      userId,
+      name: user.name,
+    });
+
+    /// 🔥 RESPONSE
+    res.json({
+      msg: "Updated successfully",
+      user: {
+        ...user._doc,
+        name: user.name || "Narada Link User",
       },
-      { $set: { username: clean } },
-      { new: true }
-    ).select("-__v");
-
-    if (!updated) {
-      return res.status(400).json({
-        msg: "Username already set or conflict occurred",
-      });
-    }
-
-    res.json({ user: updated });
+    });
 
   } catch (err) {
     console.error("Set Username Error:", err);
@@ -55,7 +75,7 @@ export const setUsername = async (req, res) => {
 };
 
 
-/// 🔥 SET NAME
+/// 🔥 SET NAME (SEPARATE API)
 export const setName = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -65,13 +85,24 @@ export const setName = async (req, res) => {
       return res.status(400).json({ msg: "Valid name required" });
     }
 
-    const updated = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
       userId,
       { name: name.trim() },
       { new: true }
-    ).select("-__v");
+    );
 
-    res.json(updated);
+    /// 🔥 SOCKET EMIT
+    const io = req.app.get("io");
+
+    io.to(userId.toString()).emit("userUpdated", {
+      userId,
+      name: updatedUser.name,
+    });
+
+    res.json({
+      ...updatedUser._doc,
+      name: updatedUser.name || "Narada Link User",
+    });
 
   } catch (err) {
     console.error("Set Name Error:", err);
@@ -96,13 +127,24 @@ export const updateProfile = async (req, res) => {
       updateData.avatar = avatar.trim();
     }
 
-    const updated = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
       { new: true }
-    ).select("-__v");
+    );
 
-    res.json(updated);
+    /// 🔥 SOCKET EMIT
+    const io = req.app.get("io");
+
+    io.to(userId.toString()).emit("userUpdated", {
+      userId,
+      name: updatedUser.name,
+    });
+
+    res.json({
+      ...updatedUser._doc,
+      name: updatedUser.name || "Narada Link User",
+    });
 
   } catch (err) {
     console.error("Update Profile Error:", err);
@@ -111,7 +153,7 @@ export const updateProfile = async (req, res) => {
 };
 
 
-/// 🔍 SEARCH USERS (🔥 DEFAULT NAME FIX)
+/// 🔍 SEARCH USERS
 export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
@@ -130,7 +172,6 @@ export const searchUsers = async (req, res) => {
       .select("username name avatar")
       .limit(20);
 
-    /// 🔥 DEFAULT NAME FIX
     const safeUsers = users.map((u) => ({
       ...u._doc,
       name: u.name || "Narada Link User",
@@ -145,12 +186,12 @@ export const searchUsers = async (req, res) => {
 };
 
 
-/// 👤 GET CURRENT USER (🔥 SAFE RETURN)
+/// 👤 GET CURRENT USER
 export const getMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
 
-    const user = await User.findById(userId).select("-__v");
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({ msg: "User not found" });

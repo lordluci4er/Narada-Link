@@ -38,7 +38,9 @@ export const sendMessage = async (req, res) => {
             type: "chat",
           },
         });
-      } catch (_) {}
+      } catch (err) {
+        console.log("FCM Error:", err.message);
+      }
     }
 
     res.status(201).json({
@@ -50,6 +52,7 @@ export const sendMessage = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Send Message Error:", error);
     res.status(500).json({ msg: "Server error" });
   }
 };
@@ -68,7 +71,6 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    /// 🔥 SAFE FORMAT
     const formatted = messages.map((m) => ({
       ...m.toObject(),
       senderId: m.senderId.toString(),
@@ -80,6 +82,7 @@ export const getMessages = async (req, res) => {
     res.json(formatted);
 
   } catch (error) {
+    console.error("Get Messages Error:", error);
     res.status(500).json({ msg: "Server error" });
   }
 };
@@ -99,26 +102,18 @@ export const getRecentChats = async (req, res) => {
           ],
         },
       },
-
       { $sort: { createdAt: -1 } },
 
       {
-        $addFields: {
-          chatUser: {
+        $group: {
+          _id: {
             $cond: [
               { $eq: ["$senderId", userId] },
               "$receiverId",
               "$senderId",
             ],
           },
-        },
-      },
-
-      {
-        $group: {
-          _id: "$chatUser",
           lastMessage: { $first: "$text" },
-          senderId: { $first: "$senderId" },
           createdAt: { $first: "$createdAt" },
         },
       },
@@ -135,16 +130,18 @@ export const getRecentChats = async (req, res) => {
     res.json(chats);
 
   } catch (err) {
+    console.error("Recent Chats Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
 
-/// 🔥 GET CONVERSATIONS (FINAL CLEAN VERSION)
+/// 🔥 GET CONVERSATIONS (🔥 FINAL CLEAN + NAME SUPPORT)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
 
+    /// 🔥 STEP 1: GET LAST MESSAGE PER USER
     const conversations = await Message.aggregate([
       {
         $match: {
@@ -158,71 +155,55 @@ export const getConversations = async (req, res) => {
       { $sort: { createdAt: -1 } },
 
       {
-        $addFields: {
-          chatUser: {
+        $group: {
+          _id: {
             $cond: [
               { $eq: ["$senderId", myId] },
               "$receiverId",
               "$senderId",
             ],
           },
-        },
-      },
-
-      {
-        $group: {
-          _id: "$chatUser",
           lastMessage: { $first: "$text" },
-          senderId: { $first: "$senderId" },
           createdAt: { $first: "$createdAt" },
         },
       },
-
-      /// 🔥 convert string → ObjectId
-      {
-        $addFields: {
-          userObjectId: { $toObjectId: "$_id" },
-          lastMessage: { $ifNull: ["$lastMessage", ""] },
-        },
-      },
-
-      /// 🔥 JOIN USER
-      {
-        $lookup: {
-          from: "users",
-          localField: "userObjectId",
-          foreignField: "_id",
-          as: "user",
-        },
-      },
-
-      /// 🔥 SAFE UNWIND
-      {
-        $unwind: {
-          path: "$user",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-
-      /// 🔥 FINAL RESPONSE SHAPE (GUARANTEED FIELDS)
-      {
-        $project: {
-          userId: "$_id",
-          username: { $ifNull: ["$user.username", "Unknown"] },
-          avatar: { $ifNull: ["$user.avatar", null] },
-          lastMessage: 1,
-          senderId: 1,
-          createdAt: 1,
-        },
-      },
-
-      { $sort: { createdAt: -1 } },
     ]);
 
-    res.json(conversations);
+    /// 🔥 STEP 2: FETCH USERS
+    const userIds = conversations.map(c =>
+      new mongoose.Types.ObjectId(c._id)
+    );
+
+    const users = await User.find({
+      _id: { $in: userIds },
+    }).select("name username avatar");
+
+    /// 🔥 STEP 3: MERGE DATA
+    const result = conversations.map((c) => {
+      const user = users.find(
+        (u) => u._id.toString() === c._id.toString()
+      );
+
+      return {
+        userId: c._id,
+        name: user?.name || "Narada Link User", // ✅ MAIN FIX
+        username: user?.username || "",
+        avatar: user?.avatar || null,
+        lastMessage: c.lastMessage || "",
+        createdAt: c.createdAt,
+      };
+    });
+
+    /// 🔥 STEP 4: SORT AGAIN (SAFETY)
+    result.sort(
+      (a, b) =>
+        new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json(result);
 
   } catch (err) {
-    console.error(err);
+    console.error("Conversations Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };

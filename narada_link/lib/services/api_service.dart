@@ -25,8 +25,9 @@ class ApiService {
     }
   }
 
-  /// 🆕 Set Username
+  /// 🔥 SET NAME + USERNAME (UPDATED)
   static Future<Map<String, dynamic>?> setUsername(
+    String name,
     String username,
     String jwt,
   ) async {
@@ -37,11 +38,14 @@ class ApiService {
           "Authorization": "Bearer $jwt",
           "Content-Type": "application/json",
         },
-        body: jsonEncode({"username": username}),
+        body: jsonEncode({
+          "name": name,
+          "username": username,
+        }),
       );
 
       if (res.statusCode == 200) {
-        return jsonDecode(res.body);
+        return jsonDecode(res.body); // 🔥 IMPORTANT
       }
 
       return null;
@@ -50,7 +54,7 @@ class ApiService {
     }
   }
 
-  /// 🆕 SET NAME
+  /// 🆕 SET NAME (OPTIONAL SEPARATE API)
   static Future<bool> setName(String name, String jwt) async {
     try {
       final res = await http.post(
@@ -193,7 +197,7 @@ class ApiService {
     }
   }
 
-  /// 💬 GET CONVERSATIONS (FULL DATA)
+  /// 💬 GET CONVERSATIONS
   static Future<List> getConversations(String jwt) async {
     try {
       final response = await http.get(
@@ -213,7 +217,7 @@ class ApiService {
     }
   }
 
-  /// 🔥 UPDATE PROFILE (FINAL)
+  /// 🔥 UPDATE PROFILE
   static Future<Map<String, dynamic>?> updateProfile(
     String name,
     String avatar,

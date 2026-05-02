@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final socket = SocketService();
 
   List chats = [];
+  bool loading = false;
 
   @override
   void initState() {
@@ -33,40 +34,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME UPDATE (NO API SPAM)
+    /// 🔥 MESSAGE REALTIME
     socket.onMessage((data) {
       updateChatList(data);
+    });
+
+    /// 🔥 USER UPDATE REALTIME (NAME CHANGE FIX)
+    socket.onUserUpdated((data) {
+      loadChats(); // ✅ CORRECT
     });
   }
 
   @override
   void dispose() {
+    /// 🔥 CLEAN ALL LISTENERS
+    socket.socket?.off("receive_message");
+    socket.socket?.off("userUpdated");
+
     socket.disconnect();
     super.dispose();
   }
 
-  /// 🔥 LOAD INITIAL CHATS
+  /// 🔥 LOAD CHATS
   void loadChats() async {
+    setState(() => loading = true);
+
     final data = await ApiService.getConversations(widget.jwt);
 
     if (!mounted) return;
 
     setState(() {
       chats = data;
+      loading = false;
     });
   }
 
   /// 🔥 REALTIME CHAT UPDATE
   void updateChatList(dynamic msg) {
-    final senderId = msg['senderId'];
-    final receiverId = msg['receiverId'];
+    final senderId = msg['senderId'].toString();
+    final receiverId = msg['receiverId'].toString();
     final text = msg['text'];
 
     final otherUserId =
         senderId == widget.myId ? receiverId : senderId;
 
     int index = chats.indexWhere(
-      (c) => c['userId'] == otherUserId,
+      (c) => c['userId'].toString() == otherUserId,
     );
 
     if (index != -1) {
@@ -75,10 +88,11 @@ class _HomeScreenState extends State<HomeScreen> {
           DateTime.now().toIso8601String();
       chats[index]['senderId'] = senderId;
     } else {
-      /// 🔥 NEW CHAT DEFAULT
       chats.insert(0, {
         'userId': otherUserId,
-        'name': "Narada Link User", // ✅ FIXED DEFAULT
+        'name': "Narada Link User",
+        'username': "",
+        'avatar': null,
         'lastMessage': text,
         'createdAt': DateTime.now().toIso8601String(),
         'senderId': senderId,
@@ -92,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {});
   }
 
-  /// 🔥 SMART TIME FORMAT
+  /// 🔥 TIME FORMAT
   String formatChatTime(String date) {
     final dt = DateTime.parse(date).toLocal();
     final now = DateTime.now();
@@ -116,16 +130,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: chats.isEmpty
-            ? _emptyState(context)
-            : _chatList(context),
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : chats.isEmpty
+                ? _emptyState(context)
+                : _chatList(context),
       ),
     );
   }
 
-  // ===========================
-  // 🔥 EMPTY STATE
-  // ===========================
+  /// 🔥 EMPTY STATE
   Widget _emptyState(BuildContext context) {
     return Center(
       child: Column(
@@ -145,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 10),
+
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -155,7 +170,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     myId: widget.myId,
                   ),
                 ),
-              );
+              ).then((_) {
+                loadChats();
+              });
             },
             child: Container(
               padding: const EdgeInsets.symmetric(
@@ -178,9 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ===========================
-  // 🔥 CHAT LIST
-  // ===========================
+  /// 🔥 CHAT LIST
   Widget _chatList(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
@@ -190,7 +205,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final userId = chat['userId'];
 
-        /// 🔥 FINAL FIX (USE NAME)
         final name =
             (chat['name'] ?? "Narada Link User").toString();
 
@@ -217,9 +231,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   jwt: widget.jwt,
                   userId: userId,
                   myId: widget.myId,
+                  userName: name,
                 ),
               ),
-            ).then((_) => loadChats());
+            ).then((_) {
+              loadChats();
+            });
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
@@ -256,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         CrossAxisAlignment.start,
                     children: [
                       Text(
-                        name, // ✅ FIXED
+                        name,
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.bold,

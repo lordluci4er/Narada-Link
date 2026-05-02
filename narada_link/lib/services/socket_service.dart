@@ -59,7 +59,7 @@ class SocketService {
     });
   }
 
-  /// 💬 SEND MESSAGE (🔥 MAP VERSION)
+  /// 💬 SEND MESSAGE (MAP VERSION)
   void sendMessage(Map<String, dynamic> data) {
     if (!(socket?.connected ?? false)) {
       print("⚠️ Socket not connected");
@@ -73,7 +73,7 @@ class SocketService {
   void onMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
-    socket!.off("receive_message"); // 🔥 avoid duplicate listener
+    socket!.off("receive_message"); // 🔥 avoid duplicate
 
     socket!.on("receive_message", (data) {
       callback(data);
@@ -104,7 +104,7 @@ class SocketService {
     });
   }
 
-  /// 🟢 ONLINE USERS (future ready)
+  /// 🟢 ONLINE USERS
   void onOnlineUsers(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -115,13 +115,25 @@ class SocketService {
     });
   }
 
-  /// 🔌 DISCONNECT (CLEANUP)
+  /// 🔥 NEW: USER UPDATED (NAME CHANGE REALTIME)
+  void onUserUpdated(Function(dynamic) callback) {
+    if (socket == null) return;
+
+    socket!.off("userUpdated"); // 🔥 prevent duplicate
+
+    socket!.on("userUpdated", (data) {
+      callback(data);
+    });
+  }
+
+  /// 🔌 DISCONNECT
   void disconnect() {
     if (socket == null) return;
 
     socket!.off("receive_message");
     socket!.off("typing");
     socket!.off("online_users");
+    socket!.off("userUpdated"); // 🔥 CLEAN THIS ALSO
 
     socket!.disconnect();
     socket!.dispose();

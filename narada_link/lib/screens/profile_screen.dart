@@ -81,18 +81,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    /// 🔥 SAFE DATA (FINAL FIX)
-    final name =
-        (user?['name'] ?? "Narada Link User").toString();
-
-    final username =
-        (user?['username'] ?? "").toString();
-
-    final email =
-        (user?['email'] ?? "").toString();
-
-    final avatar =
-        (user?['avatar'] ?? "").toString();
+    /// 🔥 SAFE DATA
+    final name = (user?['name'] ?? "Narada Link User").toString();
+    final username = (user?['username'] ?? "").toString();
+    final email = (user?['email'] ?? "").toString();
+    final avatar = (user?['avatar'] ?? "").toString();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -103,12 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
 
-        /// 🔥 EDIT BUTTON
+        /// 🔥 EDIT BUTTON (SMART UPDATE)
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final updatedUser = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => EditProfileScreen(
@@ -116,11 +109,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     currentName: name,
                   ),
                 ),
-              ).then((updated) {
-                if (updated == true) {
-                  fetchUser();
-                }
-              });
+              );
+
+              /// 🔥 INSTANT UI UPDATE (NO API CALL)
+              if (updatedUser != null && mounted) {
+                setState(() {
+                  user = updatedUser;
+                });
+              } else {
+                /// fallback
+                fetchUser();
+              }
             },
           )
         ],
@@ -142,9 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     avatar.isNotEmpty ? NetworkImage(avatar) : null,
                 child: avatar.isEmpty
                     ? Text(
-                        name.isNotEmpty
-                            ? name[0].toUpperCase()
-                            : "U",
+                        name.isNotEmpty ? name[0].toUpperCase() : "U",
                         style: const TextStyle(
                           fontSize: 24,
                           color: AppColors.primary,
