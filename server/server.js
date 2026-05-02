@@ -11,16 +11,16 @@ import User from "./models/User.js";
 
 dotenv.config();
 
-/// 🔥 DB CONNECT
+/// 🔥 CONNECT DB
 connectDB();
 
-/// 🔥 HTTP SERVER
+/// 🔥 CREATE SERVER
 const server = http.createServer(app);
 
 /// 🔥 SOCKET.IO
 const io = new Server(server, {
   cors: {
-    origin: "*", // ⚠️ restrict in production
+    origin: "*", // ⚠️ production me restrict karo
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   },
@@ -35,69 +35,69 @@ app.set("io", io);
 /// 🔥 OPTIONAL CUSTOM SOCKET FILE
 initSocket(io);
 
-/// 🔥 CONNECTION
+
+/// 🔥 MAIN CONNECTION
 io.on("connection", async (socket) => {
   console.log("🟢 Connected:", socket.id);
 
-  /// 🔥 GET USER FROM HANDSHAKE
-  const userId = socket.handshake.query.userId;
+  let userId = socket.handshake.query.userId;
 
-  if (userId) {
-    socket.userId = userId.toString();
+  /// =========================
+  /// 🟢 HANDLE USER JOIN
+  /// =========================
+  const handleJoin = async (uid) => {
+    if (!uid) return;
 
-    /// 🟢 ONLINE UPDATE
+    userId = uid.toString();
+    socket.userId = userId;
+
+    socket.join(userId);
+
+    /// 🟢 UPDATE ONLINE
     await User.findByIdAndUpdate(userId, {
       isOnline: true,
       lastSeen: new Date(),
     });
 
-    socket.join(socket.userId);
+    console.log(`👤 User ${userId} joined`);
 
-    console.log(`👤 User ${socket.userId} online`);
-
-    /// 🔥 BROADCAST ONLINE
+    /// 🔥 BROADCAST STATUS
     io.emit("userStatus", {
-      userId: socket.userId,
+      userId,
       isOnline: true,
       lastSeen: new Date(),
     });
+  };
+
+  /// 🔥 AUTO JOIN (HANDSHAKE)
+  if (userId) {
+    await handleJoin(userId);
   }
 
-  /// 🔥 FALLBACK JOIN (if handshake not used)
+  /// 🔥 MANUAL JOIN (FALLBACK)
   socket.on("join", async (uid) => {
-    if (!uid) return;
-
-    socket.userId = uid.toString();
-    socket.join(socket.userId);
-
-    await User.findByIdAndUpdate(socket.userId, {
-      isOnline: true,
-      lastSeen: new Date(),
-    });
-
-    io.emit("userStatus", {
-      userId: socket.userId,
-      isOnline: true,
-      lastSeen: new Date(),
-    });
+    await handleJoin(uid);
   });
 
-  /// 🔥 MESSAGE SEEN (REALTIME)
-  socket.on("messageSeen", async ({ userId }) => {
+  /// =========================
+  /// 👀 MESSAGE SEEN
+  /// =========================
+  socket.on("messageSeen", async ({ userId: senderId }) => {
     try {
-      if (!socket.userId || !userId) return;
+      if (!socket.userId || !senderId) return;
 
       const messages = await Message.find({
-        senderId: userId,
+        senderId: senderId,
         receiverId: socket.userId,
         status: { $ne: "seen" },
       });
 
+      if (messages.length === 0) return;
+
+      const ids = messages.map((m) => m._id);
+
       await Message.updateMany(
-        {
-          senderId: userId,
-          receiverId: socket.userId,
-        },
+        { _id: { $in: ids } },
         {
           $set: {
             status: "seen",
@@ -107,10 +107,10 @@ io.on("connection", async (socket) => {
         }
       );
 
-      /// 🔥 EMIT PER MESSAGE
-      messages.forEach((msg) => {
-        io.to(userId).emit("messageSeen", {
-          messageId: msg._id,
+      /// 🔥 EMIT ONLY UPDATED IDS
+      ids.forEach((id) => {
+        io.to(senderId).emit("messageSeen", {
+          messageId: id,
         });
       });
 
@@ -119,7 +119,9 @@ io.on("connection", async (socket) => {
     }
   });
 
-  /// 🔥 MESSAGE DELIVERED
+  /// =========================
+  /// 📦 MESSAGE DELIVERED
+  /// =========================
   socket.on("messageDelivered", async () => {
     try {
       if (!socket.userId) return;
@@ -129,11 +131,12 @@ io.on("connection", async (socket) => {
         status: "sent",
       });
 
+      if (messages.length === 0) return;
+
+      const ids = messages.map((m) => m._id);
+
       await Message.updateMany(
-        {
-          receiverId: socket.userId,
-          status: "sent",
-        },
+        { _id: { $in: ids } },
         {
           $set: {
             status: "delivered",
@@ -142,6 +145,7 @@ io.on("connection", async (socket) => {
         }
       );
 
+      /// 🔥 EMIT
       messages.forEach((msg) => {
         io.to(msg.senderId).emit("messageDelivered", {
           messageId: msg._id,
@@ -153,7 +157,9 @@ io.on("connection", async (socket) => {
     }
   });
 
+  /// =========================
   /// 🔴 DISCONNECT
+  /// =========================
   socket.on("disconnect", async () => {
     console.log("🔴 Disconnected:", socket.id);
 
@@ -172,11 +178,14 @@ io.on("connection", async (socket) => {
     });
   });
 
+  /// =========================
   /// ❌ ERROR
+  /// =========================
   socket.on("error", (err) => {
     console.log("❌ Socket Error:", err);
   });
 });
+
 
 /// 🚀 START SERVER
 const PORT = process.env.PORT || 5000;

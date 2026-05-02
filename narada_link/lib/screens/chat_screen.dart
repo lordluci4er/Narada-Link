@@ -43,7 +43,11 @@ class _ChatScreenState extends State<ChatScreen> {
     ApiService.markDelivered(widget.jwt);
     ApiService.markAsSeen(widget.userId, widget.jwt);
 
+    /// 🔥 CONNECT
     socket.connect(userId: widget.myId);
+
+    /// 🔥 JOIN ROOM (SAFE)
+    socket.socket?.emit("join", widget.myId);
 
     /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
@@ -79,10 +83,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    /// 🔥 SEEN
-    socket.socket?.on("messageSeen", (data) {
+    /// 🔥 ✅ SEEN (FIXED USING SERVICE)
+    socket.onMessageSeen((messageId) {
       final index =
-          messages.indexWhere((m) => m['_id'] == data['messageId']);
+          messages.indexWhere((m) => m['_id'] == messageId);
 
       if (index != -1 && mounted) {
         setState(() {
@@ -94,7 +98,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     /// 🟢 USER STATUS
-    socket.socket?.on("userStatus", (data) {
+    socket.onUserStatus((data) {
       if (data['userId'] == widget.userId && mounted) {
         setState(() {
           isOnline = data['isOnline'] ?? false;
@@ -126,7 +130,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🟢 USER STATUS API
+  /// 🟢 LOAD STATUS
   void loadUserStatus() async {
     final data =
         await ApiService.getUserStatus(widget.userId, widget.jwt);
@@ -233,8 +237,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-
-      /// ✅ FIX 1 (ONLY THIS — NO manual padding)
       resizeToAvoidBottomInset: true,
 
       appBar: AppBar(
@@ -273,11 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       : ListView.builder(
                           controller: scrollController,
                           reverse: true,
-
-                          /// ✅ FIX 2 (SMALL padding only)
-                          padding: const EdgeInsets.only(
-                              left: 10, right: 10, top: 10, bottom: 10),
-
+                          padding: const EdgeInsets.all(10),
                           itemCount: reversedMessages.length,
                           itemBuilder: (context, index) {
                             final m = reversedMessages[index];
@@ -323,7 +321,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
             ),
 
-            /// 🔥 INPUT (NO keyboard padding here ❌)
+            /// 🔥 INPUT
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 10, vertical: 8),

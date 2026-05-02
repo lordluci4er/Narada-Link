@@ -4,10 +4,10 @@ class MessageBubble extends StatelessWidget {
   final String text;
   final bool isMe;
 
-  /// 🔥 STATUS SYSTEM
+  /// 🔥 STATUS SYSTEM (MAIN SOURCE OF TRUTH)
   final String? status;
   final String? createdAt;
-  final String? seenAt; // ✅ FIX ADDED
+  final String? seenAt; // for future use (ChatScreen)
 
   const MessageBubble({
     super.key,
@@ -15,46 +15,50 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     this.status,
     this.createdAt,
-    this.seenAt, // ✅ REQUIRED FOR FUTURE USE
+    this.seenAt,
   });
 
-  /// 🔥 GRADIENT TICKS
-  Widget buildTicks(String? status) {
+  /// 🔥 TICKS SYSTEM (FINAL CLEAN)
+  Widget buildTicks(String status) {
     if (!isMe) return const SizedBox();
 
-    if (status == "sent") {
-      return const Icon(
-        Icons.check,
-        size: 16,
-        color: Colors.grey,
-      );
-    }
+    switch (status) {
+      case "sent":
+        return const Icon(
+          Icons.check,
+          size: 16,
+          color: Colors.grey,
+        );
 
-    if (status == "delivered") {
-      return ShaderMask(
-        shaderCallback: (bounds) => const LinearGradient(
-          colors: [Colors.purple, Colors.deepPurple],
-        ).createShader(bounds),
-        child: const Icon(
+      case "delivered":
+        return ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Colors.purple, Colors.deepPurple],
+          ).createShader(bounds),
+          child: const Icon(
+            Icons.done_all,
+            size: 16,
+            color: Colors.white,
+          ),
+        );
+
+      case "seen":
+        return const Icon(
           Icons.done_all,
           size: 16,
-          color: Colors.white,
-        ),
-      );
-    }
+          color: Colors.blueAccent,
+        );
 
-    if (status == "seen") {
-      return const Icon(
-        Icons.done_all,
-        size: 16,
-        color: Colors.blueAccent,
-      );
+      default:
+        return const Icon(
+          Icons.schedule,
+          size: 16,
+          color: Colors.grey,
+        );
     }
-
-    return const SizedBox();
   }
 
-  /// 🔥 TIME FORMAT
+  /// 🔥 TIME FORMAT (SAFE)
   String formatTime(String? date) {
     if (date == null || date.isEmpty) return "";
 
@@ -65,28 +69,6 @@ class MessageBubble extends StatelessWidget {
       final ampm = dt.hour >= 12 ? "PM" : "AM";
 
       return "$hour:${dt.minute.toString().padLeft(2, '0')} $ampm";
-    } catch (_) {
-      return "";
-    }
-  }
-
-  /// 🔥 (OPTIONAL) SMART SEEN — NOT USED HERE
-  /// 👉 ChatScreen me use hoga (last message only)
-  String smartSeen(String? seenAt) {
-    if (seenAt == null) return "";
-
-    try {
-      final diff =
-          DateTime.now().difference(DateTime.parse(seenAt));
-
-      if (diff.inSeconds < 10) return "👀 Seen just now";
-      if (diff.inMinutes < 1) return "👀 Seen few sec ago";
-      if (diff.inMinutes < 60)
-        return "👀 Seen ${diff.inMinutes}m ago";
-      if (diff.inHours < 24)
-        return "👀 Seen ${diff.inHours}h ago";
-
-      return "Seen earlier";
     } catch (_) {
       return "";
     }
@@ -125,7 +107,7 @@ class MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            /// 💬 TEXT
+            /// 💬 MESSAGE TEXT
             Text(
               text,
               style: TextStyle(
@@ -136,7 +118,7 @@ class MessageBubble extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            /// ⏱ TIME + TICKS
+            /// ⏱ TIME + STATUS
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -150,13 +132,11 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 5),
+
+                /// ✅ ONLY STATUS USED
                 buildTicks(safeStatus),
               ],
             ),
-
-            /// ❌ IMPORTANT:
-            /// 👉 seen text yaha nahi dikhana
-            /// 👉 ChatScreen me last message ke niche show hoga
           ],
         ),
       ),
