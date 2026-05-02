@@ -34,23 +34,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 MESSAGE REALTIME
+    /// 🔥 REALTIME MESSAGE
     socket.onMessage((data) {
       updateChatList(data);
     });
 
-    /// 🔥 USER UPDATE REALTIME (NAME CHANGE FIX)
+    /// 🔥 NAME UPDATE REALTIME
     socket.onUserUpdated((data) {
-      loadChats(); // ✅ CORRECT
+      loadChats();
     });
   }
 
   @override
   void dispose() {
-    /// 🔥 CLEAN ALL LISTENERS
     socket.socket?.off("receive_message");
     socket.socket?.off("userUpdated");
-
     socket.disconnect();
     super.dispose();
   }
@@ -69,11 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// 🔥 REALTIME CHAT UPDATE
+  /// 🔥 REALTIME UPDATE
   void updateChatList(dynamic msg) {
-    final senderId = msg['senderId'].toString();
-    final receiverId = msg['receiverId'].toString();
-    final text = msg['text'];
+    final senderId = msg['senderId']?.toString() ?? "";
+    final receiverId = msg['receiverId']?.toString() ?? "";
+    final text = (msg['text'] ?? "").toString();
 
     final otherUserId =
         senderId == widget.myId ? receiverId : senderId;
@@ -88,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
           DateTime.now().toIso8601String();
       chats[index]['senderId'] = senderId;
     } else {
+      /// 🔥 NEW CHAT
       chats.insert(0, {
         'userId': otherUserId,
         'name': "Narada Link User",
@@ -106,22 +105,28 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {});
   }
 
-  /// 🔥 TIME FORMAT
-  String formatChatTime(String date) {
-    final dt = DateTime.parse(date).toLocal();
-    final now = DateTime.now();
+  /// 🔥 SAFE TIME FORMAT
+  String formatChatTime(String? date) {
+    if (date == null || date.isEmpty) return "";
 
-    final today = DateTime(now.year, now.month, now.day);
-    final messageDay = DateTime(dt.year, dt.month, dt.day);
+    try {
+      final dt = DateTime.parse(date).toLocal();
+      final now = DateTime.now();
 
-    final diff = today.difference(messageDay).inDays;
+      final today = DateTime(now.year, now.month, now.day);
+      final messageDay = DateTime(dt.year, dt.month, dt.day);
 
-    if (diff == 0) {
-      return DateFormat('h:mm a').format(dt);
-    } else if (diff == 1) {
-      return "Yesterday";
-    } else {
-      return DateFormat('d MMM').format(dt);
+      final diff = today.difference(messageDay).inDays;
+
+      if (diff == 0) {
+        return DateFormat('h:mm a').format(dt);
+      } else if (diff == 1) {
+        return "Yesterday";
+      } else {
+        return DateFormat('d MMM').format(dt);
+      }
+    } catch (_) {
+      return "";
     }
   }
 
@@ -170,9 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     myId: widget.myId,
                   ),
                 ),
-              ).then((_) {
-                loadChats();
-              });
+              ).then((_) => loadChats());
             },
             child: Container(
               padding: const EdgeInsets.symmetric(
@@ -209,18 +212,17 @@ class _HomeScreenState extends State<HomeScreen> {
             (chat['name'] ?? "Narada Link User").toString();
 
         final avatar = chat['avatar'];
+
         final lastMessageRaw =
             (chat['lastMessage'] ?? "").toString();
 
         final isMe =
-            chat['senderId'].toString() == widget.myId;
+            chat['senderId']?.toString() == widget.myId;
 
         final lastMessage =
             isMe ? "You: $lastMessageRaw" : lastMessageRaw;
 
-        final time = chat['createdAt'] != null
-            ? formatChatTime(chat['createdAt'])
-            : "";
+        final time = formatChatTime(chat['createdAt']);
 
         return GestureDetector(
           onTap: () {
@@ -231,12 +233,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   jwt: widget.jwt,
                   userId: userId,
                   myId: widget.myId,
-                  userName: name,
+                  name: name, // 🔥 FINAL FIX
                 ),
               ),
-            ).then((_) {
-              loadChats();
-            });
+            ).then((_) => loadChats());
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
@@ -247,26 +247,30 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Row(
               children: [
-                /// 🔥 AVATAR
+                /// 👤 AVATAR
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: AppColors.input,
                   backgroundImage:
-                      avatar != null ? NetworkImage(avatar) : null,
-                  child: avatar == null
+                      avatar != null && avatar.toString().isNotEmpty
+                          ? NetworkImage(avatar)
+                          : null,
+                  child: (avatar == null ||
+                          avatar.toString().isEmpty)
                       ? Text(
                           name.isNotEmpty
                               ? name[0].toUpperCase()
                               : "U",
                           style: const TextStyle(
-                              color: AppColors.primary),
+                            color: AppColors.primary,
+                          ),
                         )
                       : null,
                 ),
 
                 const SizedBox(width: 12),
 
-                /// 🔥 TEXT
+                /// 💬 TEXT
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
@@ -292,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                /// 🔥 TIME
+                /// ⏱ TIME
                 Text(
                   time,
                   style: const TextStyle(

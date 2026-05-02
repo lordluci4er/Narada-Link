@@ -23,6 +23,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List users = [];
   bool loading = false;
 
+  /// 🔍 SEARCH FUNCTION
   void searchUsers(String query) async {
     if (query.trim().isEmpty) {
       setState(() => users = []);
@@ -31,12 +32,29 @@ class _SearchScreenState extends State<SearchScreen> {
 
     setState(() => loading = true);
 
-    final res = await ApiService.searchUsers(query, widget.jwt);
+    try {
+      final res = await ApiService.searchUsers(query, widget.jwt);
 
-    setState(() {
-      users = res;
-      loading = false;
-    });
+      if (!mounted) return;
+
+      setState(() {
+        users = res;
+        loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        users = [];
+        loading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -90,7 +108,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     itemBuilder: (context, index) {
                       final user = users[index];
 
-                      /// 🔥 SAFE DATA (FINAL FIX)
+                      /// 🔥 SAFE DATA
                       final name =
                           (user['name'] ?? "Narada Link User").toString();
 
@@ -103,7 +121,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 16),
 
-                        /// 🔥 AVATAR
+                        /// 👤 AVATAR
                         leading: CircleAvatar(
                           backgroundColor: AppColors.card,
                           backgroundImage:
@@ -118,7 +136,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                       ? name[0].toUpperCase()
                                       : "U",
                                   style: const TextStyle(
-                                      color: AppColors.primary),
+                                    color: AppColors.primary,
+                                  ),
                                 )
                               : null,
                         ),
@@ -145,7 +164,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           ],
                         ),
 
-                        /// 🔥 OPEN CHAT
+                        /// 🔥 OPEN CHAT (FINAL FIX)
                         onTap: () {
                           Navigator.push(
                             context,
@@ -154,6 +173,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 jwt: widget.jwt,
                                 userId: user['_id'],
                                 myId: widget.myId,
+                                name: name, // ✅ FIXED
                               ),
                             ),
                           );

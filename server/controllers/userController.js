@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import { validateUsername } from "../utils/validators.js";
 
-/// 🔥 SET USERNAME + NAME (MERGED)
+/// 🔥 SET USERNAME + NAME (FINAL SAFE)
 export const setUsername = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -13,12 +13,12 @@ export const setUsername = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    /// 🔥 NAME UPDATE (OPTIONAL)
+    /// 🔥 NAME UPDATE
     if (name && name.trim().length >= 2) {
       user.name = name.trim();
     }
 
-    /// 🔥 USERNAME UPDATE (STRICT)
+    /// 🔥 USERNAME UPDATE (SAFE)
     if (username) {
       const clean = username.toLowerCase().trim();
 
@@ -30,10 +30,10 @@ export const setUsername = async (req, res) => {
         return res.status(400).json({ msg: error });
       }
 
-      /// ❌ prevent change
+      /// ❌ prevent overwrite
       if (user.username) {
         return res.status(400).json({
-          msg: "Username already set. Cannot change.",
+          msg: "Username already set",
         });
       }
 
@@ -51,7 +51,7 @@ export const setUsername = async (req, res) => {
 
     await user.save();
 
-    /// 🔥 SOCKET EMIT (NAME UPDATE)
+    /// 🔥 SOCKET EMIT
     const io = req.app.get("io");
 
     io.to(userId.toString()).emit("userUpdated", {
@@ -59,9 +59,9 @@ export const setUsername = async (req, res) => {
       name: user.name,
     });
 
-    /// 🔥 RESPONSE
+    /// 🔥 RESPONSE (IMPORTANT)
     res.json({
-      msg: "Updated successfully",
+      msg: "Updated",
       user: {
         ...user._doc,
         name: user.name || "Narada Link User",
@@ -75,7 +75,7 @@ export const setUsername = async (req, res) => {
 };
 
 
-/// 🔥 SET NAME (SEPARATE API)
+/// 🔥 SET NAME
 export const setName = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -153,31 +153,35 @@ export const updateProfile = async (req, res) => {
 };
 
 
-/// 🔍 SEARCH USERS
+/// 🔍 SEARCH USERS (FIXED + CLEAN)
 export const searchUsers = async (req, res) => {
   try {
-    const { username } = req.query;
+    const query = (req.query.username || "").toLowerCase().trim();
 
-    if (!username) {
-      return res.status(400).json({ msg: "Search query required" });
+    if (!query) {
+      return res.json([]);
     }
 
-    const clean = username.toLowerCase().trim();
     const userId = req.user?.id || req.user;
 
     const users = await User.find({
-      username: { $regex: clean, $options: "i" },
+      username: { $regex: query, $options: "i" },
       _id: { $ne: userId },
     })
-      .select("username name avatar")
+      .select("name username avatar")
       .limit(20);
 
-    const safeUsers = users.map((u) => ({
-      ...u._doc,
-      name: u.name || "Narada Link User",
+    const result = users.map((u) => ({
+      _id: u._id,
+      name:
+        u.name && u.name.trim() !== ""
+          ? u.name
+          : "Narada Link User",
+      username: u.username || "",
+      avatar: u.avatar || null,
     }));
 
-    res.json(safeUsers);
+    res.json(result);
 
   } catch (err) {
     console.error("Search Error:", err);
@@ -222,8 +226,6 @@ export const saveFcmToken = async (req, res) => {
     await User.findByIdAndUpdate(userId, {
       fcmToken: token,
     });
-
-    console.log("🔔 FCM token saved for user:", userId);
 
     res.json({ msg: "Token saved" });
 

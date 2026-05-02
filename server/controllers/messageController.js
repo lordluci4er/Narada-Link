@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import admin from "../config/firebaseAdmin.js";
 
-/// 🔥 SEND MESSAGE
+/// 🔥 SEND MESSAGE (API + SOCKET + FCM)
 export const sendMessage = async (req, res) => {
   try {
     const senderId = (req.user?.id || req.user).toString();
@@ -15,10 +15,25 @@ export const sendMessage = async (req, res) => {
 
     const receiverIdStr = receiverId.toString();
 
+    /// 🔥 SAVE MESSAGE
     const message = await Message.create({
       senderId,
       receiverId: receiverIdStr,
       text,
+    });
+
+    /// 🔥 GET SENDER (for name)
+    const sender = await User.findById(senderId);
+
+    /// 🔥 SOCKET EMIT (REALTIME)
+    const io = req.app.get("io");
+
+    io.to(receiverIdStr).emit("newMessage", {
+      senderId,
+      receiverId: receiverIdStr,
+      text: message.text || "",
+      createdAt: message.createdAt,
+      senderName: sender?.name || "Narada Link User",
     });
 
     /// 🔔 PUSH NOTIFICATION
@@ -29,7 +44,7 @@ export const sendMessage = async (req, res) => {
         await admin.messaging().send({
           token: receiver.fcmToken,
           notification: {
-            title: "New Message 💬",
+            title: sender?.name || "New Message",
             body: text,
           },
           data: {
@@ -43,6 +58,7 @@ export const sendMessage = async (req, res) => {
       }
     }
 
+    /// 🔥 RESPONSE
     res.status(201).json({
       ...message.toObject(),
       senderId,
@@ -136,12 +152,12 @@ export const getRecentChats = async (req, res) => {
 };
 
 
-/// 🔥 GET CONVERSATIONS (🔥 FINAL CLEAN + NAME SUPPORT)
+/// 🔥 GET CONVERSATIONS (FINAL + NAME FIX)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
 
-    /// 🔥 STEP 1: GET LAST MESSAGE PER USER
+    /// 🔥 STEP 1: LAST MESSAGE PER USER
     const conversations = await Message.aggregate([
       {
         $match: {
@@ -151,7 +167,6 @@ export const getConversations = async (req, res) => {
           ],
         },
       },
-
       { $sort: { createdAt: -1 } },
 
       {
@@ -170,8 +185,8 @@ export const getConversations = async (req, res) => {
     ]);
 
     /// 🔥 STEP 2: FETCH USERS
-    const userIds = conversations.map(c =>
-      new mongoose.Types.ObjectId(c._id)
+    const userIds = conversations.map(
+      (c) => new mongoose.Types.ObjectId(c._id)
     );
 
     const users = await User.find({
@@ -186,7 +201,10 @@ export const getConversations = async (req, res) => {
 
       return {
         userId: c._id,
-        name: user?.name || "Narada Link User", // ✅ MAIN FIX
+        name:
+          user?.name && user.name.trim() !== ""
+            ? user.name
+            : "Narada Link User",
         username: user?.username || "",
         avatar: user?.avatar || null,
         lastMessage: c.lastMessage || "",
@@ -194,7 +212,7 @@ export const getConversations = async (req, res) => {
       };
     });
 
-    /// 🔥 STEP 4: SORT AGAIN (SAFETY)
+    /// 🔥 STEP 4: SORT
     result.sort(
       (a, b) =>
         new Date(b.createdAt) - new Date(a.createdAt)

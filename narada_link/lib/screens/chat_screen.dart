@@ -8,14 +8,14 @@ class ChatScreen extends StatefulWidget {
   final String jwt;
   final String userId;
   final String myId;
-  final String? userName;
+  final String? name;
 
   const ChatScreen({
     super.key,
     required this.jwt,
     required this.userId,
     required this.myId,
-    this.userName,
+    this.name,
   });
 
   @override
@@ -28,7 +28,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final scrollController = ScrollController();
 
   List<Map<String, dynamic>> messages = [];
-  bool loading = false; // 🔥 improved UX
+  bool loading = false;
 
   @override
   void initState() {
@@ -36,21 +36,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME LISTENER (FIXED)
-    socket.onMessage((data) {
-      final senderId = data['senderId'].toString();
-      final receiverId = data['receiverId'].toString();
+    /// 🔥 NEW MESSAGE LISTENER (UPDATED)
+    socket.onNewMessage((data) {
+      final senderId = data['senderId']?.toString() ?? "";
 
-      /// ❌ skip own message (already added locally)
+      /// ❌ skip own message
       if (senderId == widget.myId.toString()) return;
 
-      /// ✅ only this chat messages
-      if (senderId == widget.userId &&
-          receiverId == widget.myId) {
+      /// ✅ only current chat
+      if (senderId == widget.userId) {
         setState(() {
           messages.add({
             "senderId": senderId,
-            "receiverId": receiverId,
+            "receiverId": widget.myId,
             "text": data['text'],
             "createdAt": data['createdAt'] ??
                 DateTime.now().toIso8601String(),
@@ -66,9 +64,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// 🔥 LOAD MESSAGES
   void loadMessages() async {
-    setState(() {
-      loading = true;
-    });
+    setState(() => loading = true);
 
     try {
       final data = await ApiService.getMessages(
@@ -77,6 +73,8 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       final formatted = List<Map<String, dynamic>>.from(data);
+
+      if (!mounted) return;
 
       setState(() {
         messages = formatted;
@@ -87,9 +85,8 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       print("🔥 Load messages error: $e");
 
-      setState(() {
-        loading = false;
-      });
+      if (!mounted) return;
+      setState(() => loading = false);
     }
   }
 
@@ -120,17 +117,15 @@ class _ChatScreenState extends State<ChatScreen> {
       "createdAt": DateTime.now().toIso8601String(),
     };
 
-    /// 🔥 INSTANT UI
-    setState(() {
-      messages.add(newMsg);
-    });
+    /// 🔥 instant UI
+    setState(() => messages.add(newMsg));
 
     scrollToBottom();
 
-    /// 🔥 SOCKET SEND
+    /// 🔥 socket send
     socket.sendMessage(newMsg);
 
-    /// 🔥 SAVE TO DB
+    /// 🔥 save to DB
     await ApiService.sendMessage(
       widget.userId,
       text,
@@ -140,8 +135,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    /// 🔥 IMPORTANT: remove listener
-    socket.socket?.off("receive_message");
+    /// 🔥 clean listeners properly
+    socket.socket?.off("newMessage");
 
     socket.disconnect();
     controller.dispose();
@@ -160,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final displayName =
-        (widget.userName ?? "Narada Link User").toString();
+        (widget.name ?? "Narada Link User").toString();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -181,7 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Center(child: CircularProgressIndicator()),
               )
 
-            /// 💤 EMPTY STATE
+            /// 💤 EMPTY
             else if (messages.isEmpty)
               const Expanded(
                 child: Center(
@@ -224,11 +219,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: controller,
                       style: const TextStyle(
-                          color: AppColors.primary),
+                        color: AppColors.primary,
+                      ),
                       decoration: const InputDecoration(
                         hintText: "Type a message...",
-                        hintStyle: TextStyle(
-                            color: AppColors.secondary),
+                        hintStyle:
+                            TextStyle(color: AppColors.secondary),
                       ),
                     ),
                   ),

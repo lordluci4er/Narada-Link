@@ -69,13 +69,24 @@ class SocketService {
     socket!.emit("send_message", data);
   }
 
-  /// 📥 RECEIVE MESSAGE
+  /// 📥 RECEIVE MESSAGE (OLD EVENT)
   void onMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
     socket!.off("receive_message"); // 🔥 avoid duplicate
 
     socket!.on("receive_message", (data) {
+      callback(data);
+    });
+  }
+
+  /// 🔥 NEW MESSAGE (FUTURE READY WITH NAME)
+  void onNewMessage(Function(dynamic) callback) {
+    if (socket == null) return;
+
+    socket!.off("newMessage");
+
+    socket!.on("newMessage", (data) {
       callback(data);
     });
   }
@@ -115,25 +126,26 @@ class SocketService {
     });
   }
 
-  /// 🔥 NEW: USER UPDATED (NAME CHANGE REALTIME)
+  /// 🔥 USER UPDATED (NAME CHANGE REALTIME)
   void onUserUpdated(Function(dynamic) callback) {
     if (socket == null) return;
 
-    socket!.off("userUpdated"); // 🔥 prevent duplicate
+    socket!.off("userUpdated");
 
     socket!.on("userUpdated", (data) {
       callback(data);
     });
   }
 
-  /// 🔌 DISCONNECT
+  /// 🔌 DISCONNECT (FULL CLEANUP)
   void disconnect() {
     if (socket == null) return;
 
     socket!.off("receive_message");
+    socket!.off("newMessage"); // 🔥 ADD THIS
     socket!.off("typing");
     socket!.off("online_users");
-    socket!.off("userUpdated"); // 🔥 CLEAN THIS ALSO
+    socket!.off("userUpdated");
 
     socket!.disconnect();
     socket!.dispose();
