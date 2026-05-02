@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import admin from "../config/firebaseAdmin.js";
 
-/// 🔥 SEND MESSAGE (UPDATED WITH REPLY SUPPORT)
+/// 🔥 SEND MESSAGE
 export const sendMessage = async (req, res) => {
   try {
     const senderId = (req.user?.id || req.user).toString();
@@ -26,22 +26,17 @@ export const sendMessage = async (req, res) => {
       senderId,
       receiverId: receiverIdStr,
       text,
-
-      /// 🔥 REPLY FIELDS
       replyTo: replyTo || null,
       replyText: replyText || null,
       replySenderId: replySenderId || null,
-
       seen: false,
       status: "sent",
-      deliveredAt: null,
-      seenAt: null,
     });
 
     const sender = await User.findById(senderId);
     const io = req.app.get("io");
 
-    /// 🔥 REALTIME (INCLUDE REPLY DATA)
+    /// 🔥 REALTIME
     io.to(receiverIdStr).emit("newMessage", {
       messageId: message._id,
       senderId,
@@ -50,14 +45,12 @@ export const sendMessage = async (req, res) => {
       createdAt: message.createdAt,
       senderName: sender?.name || "Narada Link User",
       status: "sent",
-
-      /// 🔥 REPLY DATA SEND
       replyTo: message.replyTo,
       replyText: message.replyText,
       replySenderId: message.replySenderId,
     });
 
-    /// 🔔 PUSH NOTIFICATION
+    /// 🔔 PUSH
     const receiver = await User.findById(receiverIdStr);
 
     if (receiver?.fcmToken) {
@@ -83,7 +76,7 @@ export const sendMessage = async (req, res) => {
 };
 
 
-/// 🔥 GET MESSAGES + AUTO SEEN (UPDATED WITH REPLY)
+/// 🔥 GET MESSAGES
 export const getMessages = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -97,7 +90,7 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    /// 🔥 MARK SEEN
+    /// 🔥 AUTO SEEN
     const unseenIds = messages
       .filter(
         (m) =>
@@ -121,32 +114,13 @@ export const getMessages = async (req, res) => {
         }
       );
 
-      /// 🔥 BULK EMIT (BETTER THAN LOOP)
       io.to(userId).emit("messagesSeen", {
         messageIds: unseenIds,
         seenAt: now,
       });
     }
 
-    /// 🔥 FORMAT RESPONSE (INCLUDE REPLY)
-    const formatted = messages.map((m) => ({
-      ...m.toObject(),
-      senderId: m.senderId.toString(),
-      receiverId: m.receiverId.toString(),
-
-      text: m.text || "",
-      status: m.status || "sent",
-
-      deliveredAt: m.deliveredAt || null,
-      seenAt: m.seenAt || null,
-
-      /// 🔥 REPLY DATA
-      replyTo: m.replyTo || null,
-      replyText: m.replyText || null,
-      replySenderId: m.replySenderId || null,
-    }));
-
-    res.json(formatted);
+    res.json(messages);
 
   } catch (error) {
     console.error("Get Messages Error:", error);
@@ -155,7 +129,7 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS DELIVERED (NO CHANGE NEEDED)
+/// 🔥 MARK AS DELIVERED
 export const markAsDelivered = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -199,7 +173,7 @@ export const markAsDelivered = async (req, res) => {
 };
 
 
-/// 🔥 GET CONVERSATIONS (NO CHANGE)
+/// 🔥 GET CONVERSATIONS
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -214,7 +188,6 @@ export const getConversations = async (req, res) => {
         },
       },
       { $sort: { createdAt: -1 } },
-
       {
         $group: {
           _id: {
@@ -226,58 +199,57 @@ export const getConversations = async (req, res) => {
           },
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
-
-          unreadCount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ["$receiverId", myId] },
-                    { $ne: ["$status", "seen"] },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
         },
       },
+      { $sort: { createdAt: -1 } },
     ]);
 
-    const userIds = conversations.map(
-      (c) => new mongoose.Types.ObjectId(c._id)
-    );
-
-    const users = await User.find({
-      _id: { $in: userIds },
-    }).select("name username avatar");
-
-    const result = conversations.map((c) => {
-      const user = users.find(
-        (u) => u._id.toString() === c._id.toString()
-      );
-
-      return {
-        userId: c._id,
-        name: user?.name?.trim() || "Narada Link User",
-        username: user?.username || "",
-        avatar: user?.avatar || null,
-        lastMessage: c.lastMessage || "",
-        createdAt: c.createdAt,
-        unreadCount: c.unreadCount || 0,
-      };
-    });
-
-    result.sort(
-      (a, b) =>
-        new Date(b.createdAt) - new Date(a.createdAt)
-    );
-
-    res.json(result);
+    res.json(conversations);
 
   } catch (err) {
     console.error("Conversations Error:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+
+/// 🔥 ✅ FIXED: GET RECENT CHATS (MISSING FUNCTION)
+export const getRecentChats = async (req, res) => {
+  try {
+    const userId = (req.user?.id || req.user).toString();
+
+    const chats = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$senderId", userId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+          lastMessage: { $first: "$text" },
+          createdAt: { $first: "$createdAt" },
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    res.json(chats);
+
+  } catch (err) {
+    console.error("Recent Chats Error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
