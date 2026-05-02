@@ -17,7 +17,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return null;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (login): $e");
       return null;
     }
   }
@@ -45,7 +46,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return null;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (setUsername): $e");
       return null;
     }
   }
@@ -63,7 +65,8 @@ class ApiService {
       );
 
       return res.statusCode == 200;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (setName): $e");
       return false;
     }
   }
@@ -83,7 +86,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return null;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (getMe): $e");
       return null;
     }
   }
@@ -102,7 +106,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (searchUsers): $e");
       return [];
     }
   }
@@ -121,7 +126,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (getMessages): $e");
       return [];
     }
   }
@@ -146,36 +152,13 @@ class ApiService {
       );
 
       return res.statusCode == 201;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (sendMessage): $e");
       return false;
     }
   }
 
-  /// 🔥 MARK AS DELIVERED
-  static Future<void> markDelivered(String jwt) async {
-    try {
-      await http.put(
-        Uri.parse("$baseUrl/api/messages/delivered"),
-        headers: {
-          "Authorization": "Bearer $jwt",
-        },
-      );
-    } catch (_) {}
-  }
-
-  /// 🔥 MARK AS SEEN
-  static Future<void> markAsSeen(String userId, String jwt) async {
-    try {
-      await http.put(
-        Uri.parse("$baseUrl/api/messages/seen/$userId"),
-        headers: {
-          "Authorization": "Bearer $jwt",
-        },
-      );
-    } catch (_) {}
-  }
-
-  /// 🟢 GET USER ONLINE STATUS (🔥 NEW)
+  /// 🟢 GET USER ONLINE STATUS
   static Future<Map<String, dynamic>?> getUserStatus(
     String userId,
     String jwt,
@@ -192,7 +175,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return null;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (getUserStatus): $e");
       return null;
     }
   }
@@ -211,7 +195,9 @@ class ApiService {
         },
         body: jsonEncode({"token": fcmToken}),
       );
-    } catch (_) {}
+    } catch (e) {
+      print("API ERROR (saveFcmToken): $e");
+    }
   }
 
   /// 💬 GET RECENT CHATS
@@ -228,7 +214,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (getRecentChats): $e");
       return [];
     }
   }
@@ -247,7 +234,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (getConversations): $e");
       return [];
     }
   }
@@ -275,7 +263,8 @@ class ApiService {
         return jsonDecode(res.body);
       }
       return null;
-    } catch (_) {
+    } catch (e) {
+      print("API ERROR (updateProfile): $e");
       return null;
     }
   }

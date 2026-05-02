@@ -36,7 +36,7 @@ class SocketService {
       isConnected = true;
       print("🟢 Socket Connected");
 
-      /// 🔥 JOIN ROOM (important)
+      /// 🔥 JOIN ROOM
       socket!.emit("join", userId.toString());
     });
 
@@ -61,17 +61,7 @@ class SocketService {
     });
   }
 
-  /// 💬 SEND MESSAGE
-  void sendMessage(Map<String, dynamic> data) {
-    if (!(socket?.connected ?? false)) {
-      print("⚠️ Socket not connected");
-      return;
-    }
-
-    socket!.emit("send_message", data);
-  }
-
-  /// 👀 SEND SEEN (🔥 MOST IMPORTANT)
+  /// 👀 SEND SEEN (KEEP)
   void sendSeen({
     required String senderId,
   }) {
@@ -82,35 +72,17 @@ class SocketService {
     });
   }
 
-  /// 📦 SEND DELIVERED (OPTIONAL BUT GOOD)
-  void sendDelivered() {
-    if (!(socket?.connected ?? false)) return;
-
-    socket!.emit("messageDelivered");
-  }
-
-  /// 📩 NEW MESSAGE
+  /// 📩 NEW MESSAGE (KEEP)
   void onNewMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
-    socket!.off("newMessage"); // prevent duplicate
+    socket!.off("newMessage");
     socket!.on("newMessage", (data) {
       callback(data);
     });
   }
 
-  /// 👀 MESSAGE SEEN (PER MESSAGE)
-  void onMessageSeen(Function(dynamic data) callback) {
-    if (socket == null) return;
-
-    socket!.off("messageSeen");
-
-    socket!.on("messageSeen", (data) {
-      callback(data); // includes messageId + seenAt
-    });
-  }
-
-  /// 🔵 BULK SEEN (FUTURE USE)
+  /// 🔵 BULK SEEN (KEEP)
   void onMessagesSeen(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -121,30 +93,7 @@ class SocketService {
     });
   }
 
-  /// ✍️ TYPING
-  void sendTyping({
-    required String senderId,
-    required String receiverId,
-  }) {
-    if (!(socket?.connected ?? false)) return;
-
-    socket!.emit("typing", {
-      "senderId": senderId,
-      "receiverId": receiverId,
-    });
-  }
-
-  void onTyping(Function(dynamic) callback) {
-    if (socket == null) return;
-
-    socket!.off("typing");
-
-    socket!.on("typing", (data) {
-      callback(data);
-    });
-  }
-
-  /// 🟢 ONLINE STATUS
+  /// 🟢 ONLINE STATUS (KEEP)
   void onUserStatus(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -155,7 +104,7 @@ class SocketService {
     });
   }
 
-  /// 🔥 USER UPDATED
+  /// 🔥 USER UPDATED (UNCHANGED)
   void onUserUpdated(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -171,9 +120,7 @@ class SocketService {
     if (socket == null) return;
 
     socket!.off("newMessage");
-    socket!.off("messageSeen");
     socket!.off("messagesSeen");
-    socket!.off("typing");
     socket!.off("userStatus");
     socket!.off("userUpdated");
 

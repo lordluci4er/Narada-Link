@@ -43,11 +43,9 @@ class _ChatScreenState extends State<ChatScreen> {
     loadMessages();
     loadUserStatus();
 
-    ApiService.markDelivered(widget.jwt);
+    /// ❌ REMOVED ApiService.markDelivered
 
     socket.connect(userId: widget.myId);
-    socket.socket?.emit("join", widget.myId);
-
     socket.sendSeen(senderId: widget.userId);
 
     socket.onNewMessage((data) {
@@ -72,8 +70,23 @@ class _ChatScreenState extends State<ChatScreen> {
         });
 
         scrollToBottom();
+
         socket.sendSeen(senderId: widget.userId);
       }
+    });
+
+    socket.onMessagesSeen((data) {
+      final ids = List<String>.from(data['messageIds'] ?? []);
+      final seenAt = data['seenAt'];
+
+      for (var msg in messages) {
+        if (ids.contains(msg['_id'])) {
+          msg['status'] = "seen";
+          msg['seenAt'] = seenAt;
+        }
+      }
+
+      if (mounted) setState(() {});
     });
 
     socket.socket?.on("messageDelivered", (data) {
@@ -82,18 +95,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (index != -1 && mounted) {
         setState(() => messages[index]['status'] = "delivered");
-      }
-    });
-
-    socket.socket?.on("messageSeen", (data) {
-      final index =
-          messages.indexWhere((m) => m['_id'] == data['messageId']);
-
-      if (index != -1 && mounted) {
-        setState(() {
-          messages[index]['status'] = "seen";
-          messages[index]['seenAt'] = data['seenAt'];
-        });
       }
     });
 
@@ -107,21 +108,18 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SET REPLY
   void setReply(Map<String, dynamic> msg) {
     setState(() {
       replyingTo = msg;
     });
   }
 
-  /// 🔥 CLEAR REPLY
   void clearReply() {
     setState(() {
       replyingTo = null;
     });
   }
 
-  /// 🔥 LOAD MESSAGES
   void loadMessages() async {
     setState(() => loading = true);
 
@@ -143,7 +141,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🟢 LOAD STATUS
   void loadUserStatus() async {
     final data =
         await ApiService.getUserStatus(widget.userId, widget.jwt);
@@ -168,7 +165,6 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SEND MESSAGE
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
@@ -196,8 +192,6 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     scrollToBottom();
-
-    socket.sendMessage(newMsg);
 
     await ApiService.sendMessage(
       widget.userId,
@@ -233,7 +227,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
       body: Column(
         children: [
-          /// 💬 MESSAGES
           Expanded(
             child: ListView.builder(
               controller: scrollController,
@@ -254,7 +247,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          /// 🔥 REPLY PREVIEW (IMPROVED UI)
           if (replyingTo != null)
             Container(
               padding: const EdgeInsets.all(10),
@@ -304,7 +296,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-          /// 🔥 INPUT
           Container(
             padding: const EdgeInsets.all(10),
             child: Row(

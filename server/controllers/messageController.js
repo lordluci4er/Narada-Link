@@ -74,12 +74,11 @@ export const sendMessage = async (req, res) => {
 };
 
 
-/// 🔥 GET MESSAGES (HYBRID)
+/// 🔥 GET MESSAGES (CLEAN - FETCH ONLY)
 export const getMessages = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
     const userId = req.params.userId.toString();
-    const io = req.app.get("io");
 
     const messages = await Message.find({
       $or: [
@@ -88,37 +87,9 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    /// 🔥 AUTO SEEN (bulk)
-    const unseenIds = messages
-      .filter(
-        (m) =>
-          m.senderId === userId &&
-          m.receiverId === myId &&
-          m.status !== "seen"
-      )
-      .map((m) => m._id);
+    /// ❌ REMOVED unseen logic + updateMany + emit
 
-    if (unseenIds.length > 0) {
-      const now = new Date();
-
-      await Message.updateMany(
-        { _id: { $in: unseenIds } },
-        {
-          $set: {
-            status: "seen",
-            seen: true,
-            seenAt: now,
-          },
-        }
-      );
-
-      io.to(userId).emit("messagesSeen", {
-        messageIds: unseenIds,
-        seenAt: now,
-      });
-    }
-
-    /// 🔥 FORMAT (OLD + NEW MIX)
+    /// 🔥 FORMAT
     const formatted = messages.map((m) => ({
       ...m.toObject(),
       senderId: m.senderId.toString(),
@@ -140,95 +111,12 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS DELIVERED
-export const markAsDelivered = async (req, res) => {
-  try {
-    const myId = (req.user?.id || req.user).toString();
+/// ❌ REMOVED markAsDelivered API
 
-    const messages = await Message.find({
-      receiverId: myId,
-      status: "sent",
-    });
-
-    if (!messages.length) {
-      return res.json({ msg: "Nothing to update" });
-    }
-
-    const ids = messages.map((m) => m._id);
-    const io = req.app.get("io");
-
-    const now = new Date();
-
-    await Message.updateMany(
-      { _id: { $in: ids } },
-      {
-        $set: {
-          status: "delivered",
-          deliveredAt: now,
-        },
-      }
-    );
-
-    messages.forEach((msg) => {
-      io.to(msg.senderId).emit("messageDelivered", {
-        messageId: msg._id,
-      });
-    });
-
-    res.json({ msg: "Delivered updated" });
-  } catch (err) {
-    console.error("Delivered Error:", err);
-    res.status(500).json({ msg: "Error updating delivered" });
-  }
-};
+/// ❌ REMOVED markAsSeen API
 
 
-/// 🔥 MARK AS SEEN (KEEP FOR BACKUP API)
-export const markAsSeen = async (req, res) => {
-  try {
-    const myId = (req.user?.id || req.user).toString();
-    const userId = req.params.userId.toString();
-
-    const messages = await Message.find({
-      senderId: userId,
-      receiverId: myId,
-      status: { $ne: "seen" },
-    });
-
-    if (!messages.length) {
-      return res.json({ msg: "Nothing to update" });
-    }
-
-    const ids = messages.map((m) => m._id);
-    const io = req.app.get("io");
-
-    const now = new Date();
-
-    await Message.updateMany(
-      { _id: { $in: ids } },
-      {
-        $set: {
-          status: "seen",
-          seen: true,
-          seenAt: now,
-        },
-      }
-    );
-
-    io.to(userId).emit("messagesSeen", {
-      messageIds: ids,
-      seenAt: now,
-    });
-
-    res.json({ msg: "Seen updated" });
-  } catch (err) {
-    console.error("Seen Error:", err);
-    res.status(500).json({ msg: "Error updating seen" });
-  }
-};
-
-
-/// 🔥 GET CONVERSATIONS (WITH UNREAD COUNT)
+/// 🔥 GET CONVERSATIONS (FIXED)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -273,7 +161,32 @@ export const getConversations = async (req, res) => {
       },
     ]);
 
-    res.json(conversations);
+    /// 🔥 ADD USER DATA
+    const userIds = conversations.map(
+      (c) => new mongoose.Types.ObjectId(c._id)
+    );
+
+    const users = await User.find({
+      _id: { $in: userIds },
+    }).select("name username avatar");
+
+    const result = conversations.map((c) => {
+      const user = users.find(
+        (u) => u._id.toString() === c._id.toString()
+      );
+
+      return {
+        userId: c._id,
+        name: user?.name || "Narada Link User",
+        username: user?.username || "",
+        avatar: user?.avatar || null,
+        lastMessage: c.lastMessage,
+        createdAt: c.createdAt,
+        unreadCount: c.unreadCount,
+      };
+    });
+
+    res.json(result);
   } catch (err) {
     console.error("Conversations Error:", err);
     res.status(500).json({ msg: "Server error" });
@@ -281,7 +194,7 @@ export const getConversations = async (req, res) => {
 };
 
 
-/// 🔥 GET RECENT CHATS
+/// 🔥 GET RECENT CHATS (UNCHANGED)
 export const getRecentChats = async (req, res) => {
   try {
     const userId = (req.user?.id || req.user).toString();

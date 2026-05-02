@@ -141,7 +141,7 @@ io.on("connection", async (socket) => {
         }
       );
 
-      /// 🔥 BULK EMIT (UPDATED)
+      /// 🔥 BULK EMIT
       io.to(senderId).emit("messagesSeen", {
         messageIds: ids,
         seenAt,
@@ -152,43 +152,7 @@ io.on("connection", async (socket) => {
     }
   });
 
-  /// =========================
-  /// 📦 MESSAGE DELIVERED (MANUAL TRIGGER)
-  /// =========================
-  socket.on("messageDelivered", async () => {
-    try {
-      if (!socket.userId) return;
-
-      const messages = await Message.find({
-        receiverId: socket.userId,
-        status: "sent",
-      });
-
-      if (messages.length === 0) return;
-
-      const deliveredAt = new Date();
-      const ids = messages.map((m) => m._id);
-
-      await Message.updateMany(
-        { _id: { $in: ids } },
-        {
-          $set: {
-            status: "delivered",
-            deliveredAt,
-          },
-        }
-      );
-
-      messages.forEach((msg) => {
-        io.to(msg.senderId.toString()).emit("messageDelivered", {
-          messageId: msg._id,
-        });
-      });
-
-    } catch (err) {
-      console.log("❌ Delivered Error:", err.message);
-    }
-  });
+  /// ❌ REMOVED messageDelivered handler
 
   /// =========================
   /// 🔴 DISCONNECT

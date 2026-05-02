@@ -34,22 +34,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 JOIN (IMPORTANT)
-    socket.socket?.emit("join", widget.myId);
+    /// ❌ REMOVED duplicate join
 
     /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
       updateChatList(data);
     });
 
-    /// 🔥 ✅ BULK SEEN (NEW SYSTEM)
+    /// 🔥 ✅ BULK SEEN (FIXED)
     socket.onMessagesSeen((data) {
-      final ids = data['messageIds'] ?? [];
+      final ids = List<String>.from(data['messageIds'] ?? []);
+
+      print("Seen messages: $ids");
 
       for (var chat in chats) {
-        if (chat['userId'] == data['by']) {
-          chat['unreadCount'] = 0;
-        }
+        chat['unreadCount'] = 0;
       }
 
       if (mounted) setState(() {});
