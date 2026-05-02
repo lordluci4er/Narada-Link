@@ -97,7 +97,7 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS DELIVERED (OPTIMIZED)
+/// 🔥 MARK AS DELIVERED
 export const markAsDelivered = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -140,7 +140,7 @@ export const markAsDelivered = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS SEEN (FINAL OPTIMIZED)
+/// 🔥 MARK AS SEEN
 export const markAsSeen = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -182,6 +182,48 @@ export const markAsSeen = async (req, res) => {
   } catch (err) {
     console.error("Seen Error:", err);
     res.status(500).json({ msg: "Error updating seen" });
+  }
+};
+
+
+/// 🔥 ✅ FIXED: GET RECENT CHATS (ADDED BACK)
+export const getRecentChats = async (req, res) => {
+  try {
+    const userId = (req.user?.id || req.user).toString();
+
+    const chats = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$senderId", userId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+          lastMessage: { $first: "$text" },
+          createdAt: { $first: "$createdAt" },
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    res.json(chats);
+
+  } catch (err) {
+    console.error("Recent Chats Error:", err);
+    res.status(500).json({ msg: "Server error" });
   }
 };
 
