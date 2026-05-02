@@ -23,6 +23,27 @@ const messageSchema = new mongoose.Schema(
       trim: true,
     },
 
+    /// 🔁 REPLY SUPPORT (🔥 NEW)
+
+    // original message reference
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+
+    // original message text snapshot (fast UI)
+    replyText: {
+      type: String,
+      default: null,
+    },
+
+    // kisne original message bheja tha
+    replySenderId: {
+      type: String,
+      default: null,
+    },
+
     /// 👁️ QUICK FLAG
     seen: {
       type: Boolean,
@@ -54,7 +75,7 @@ const messageSchema = new mongoose.Schema(
   }
 );
 
-/// 🔥🔥🔥 COMPOUND INDEXES (REAL PERFORMANCE BOOST)
+/// 🔥🔥🔥 INDEXES
 
 /// chat fetch fast
 messageSchema.index({ senderId: 1, receiverId: 1, createdAt: 1 });
@@ -64,5 +85,8 @@ messageSchema.index({ receiverId: 1, status: 1 });
 
 /// reverse chat queries
 messageSchema.index({ receiverId: 1, senderId: 1, createdAt: 1 });
+
+/// 🔥 reply lookup optimization
+messageSchema.index({ replyTo: 1 });
 
 export default mongoose.model("Message", messageSchema);
