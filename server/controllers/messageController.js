@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import admin from "../config/firebaseAdmin.js";
 
-/// 🔥 SEND MESSAGE
+/// 🔥 SEND MESSAGE (STATUS = SENT)
 export const sendMessage = async (req, res) => {
   try {
     const senderId = (req.user?.id || req.user).toString();
@@ -21,19 +21,22 @@ export const sendMessage = async (req, res) => {
       receiverId: receiverIdStr,
       text,
       seen: false,
+      status: "sent",
     });
 
     const sender = await User.findById(senderId);
 
-    /// 🔥 SOCKET EMIT
     const io = req.app.get("io");
 
+    /// 🔥 REALTIME MESSAGE
     io.to(receiverIdStr).emit("newMessage", {
+      messageId: message._id,
       senderId,
       receiverId: receiverIdStr,
-      text: message.text || "",
+      text: message.text,
       createdAt: message.createdAt,
       senderName: sender?.name || "Narada Link User",
+      status: "sent",
     });
 
     /// 🔔 PUSH
@@ -47,25 +50,13 @@ export const sendMessage = async (req, res) => {
             title: sender?.name || "New Message",
             body: text,
           },
-          data: {
-            senderId,
-            receiverId: receiverIdStr,
-            type: "chat",
-          },
         });
       } catch (err) {
         console.log("FCM Error:", err.message);
       }
     }
 
-    res.status(201).json({
-      ...message.toObject(),
-      senderId,
-      receiverId: receiverIdStr,
-      text: message.text || "",
-      createdAt: message.createdAt,
-      seen: message.seen,
-    });
+    res.status(201).json(message);
 
   } catch (error) {
     console.error("Send Message Error:", error);
@@ -92,8 +83,9 @@ export const getMessages = async (req, res) => {
       senderId: m.senderId.toString(),
       receiverId: m.receiverId.toString(),
       text: m.text || "",
-      createdAt: m.createdAt,
-      seen: m.seen ?? false,
+      status: m.status || "sent",
+      deliveredAt: m.deliveredAt || null,
+      seenAt: m.seenAt || null,
     }));
 
     res.json(formatted);
@@ -105,79 +97,92 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS SEEN
+/// 🔥 MARK AS DELIVERED (FIXED)
+export const markAsDelivered = async (req, res) => {
+  try {
+    const myId = (req.user?.id || req.user).toString();
+
+    const messages = await Message.find({
+      receiverId: myId,
+      status: "sent",
+    });
+
+    await Message.updateMany(
+      {
+        receiverId: myId,
+        status: "sent",
+      },
+      {
+        $set: {
+          status: "delivered",
+          deliveredAt: new Date(),
+        },
+      }
+    );
+
+    const io = req.app.get("io");
+
+    /// 🔥 IMPORTANT FIX → sender को notify करो
+    messages.forEach((msg) => {
+      io.to(msg.senderId).emit("messageDelivered", {
+        messageId: msg._id,
+      });
+    });
+
+    res.json({ msg: "Delivered updated" });
+
+  } catch (err) {
+    console.error("Delivered Error:", err);
+    res.status(500).json({ msg: "Error updating delivered" });
+  }
+};
+
+
+/// 🔥 MARK AS SEEN (FIXED)
 export const markAsSeen = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
     const userId = req.params.userId.toString();
 
+    const messages = await Message.find({
+      senderId: userId,
+      receiverId: myId,
+      status: { $ne: "seen" },
+    });
+
     await Message.updateMany(
       {
         senderId: userId,
         receiverId: myId,
-        seen: false,
       },
-      { $set: { seen: true } }
+      {
+        $set: {
+          status: "seen",
+          seen: true,
+          seenAt: new Date(),
+        },
+      }
     );
+
+    const io = req.app.get("io");
+
+    /// 🔥 IMPORTANT FIX → messageId भेजना जरूरी
+    messages.forEach((msg) => {
+      io.to(userId).emit("messageSeen", {
+        messageId: msg._id,
+      });
+    });
 
     res.json({ msg: "Seen updated" });
 
   } catch (err) {
-    console.error("Mark Seen Error:", err);
+    console.error("Seen Error:", err);
     res.status(500).json({ msg: "Error updating seen" });
   }
 };
 
 
-/// 🔥 GET RECENT CHATS
-export const getRecentChats = async (req, res) => {
-  try {
-    const userId = (req.user?.id || req.user).toString();
-
-    const chats = await Message.aggregate([
-      {
-        $match: {
-          $or: [
-            { senderId: userId },
-            { receiverId: userId },
-          ],
-        },
-      },
-      { $sort: { createdAt: -1 } },
-
-      {
-        $group: {
-          _id: {
-            $cond: [
-              { $eq: ["$senderId", userId] },
-              "$receiverId",
-              "$senderId",
-            ],
-          },
-          lastMessage: { $first: "$text" },
-          createdAt: { $first: "$createdAt" },
-        },
-      },
-
-      {
-        $addFields: {
-          lastMessage: { $ifNull: ["$lastMessage", ""] },
-        },
-      },
-
-      { $sort: { createdAt: -1 } },
-    ]);
-
-    res.json(chats);
-
-  } catch (err) {
-    console.error("Recent Chats Error:", err);
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-
-/// 🔥 GET CONVERSATIONS (🔥 FINAL WITH UNREAD COUNT)
+/// 🔥 GET CONVERSATIONS
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -191,7 +196,6 @@ export const getConversations = async (req, res) => {
           ],
         },
       },
-
       { $sort: { createdAt: -1 } },
 
       {
@@ -203,18 +207,16 @@ export const getConversations = async (req, res) => {
               "$senderId",
             ],
           },
-
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
 
-          /// 🔥 UNREAD COUNT
           unreadCount: {
             $sum: {
               $cond: [
                 {
                   $and: [
                     { $eq: ["$receiverId", myId] },
-                    { $eq: ["$seen", false] },
+                    { $ne: ["$status", "seen"] },
                   ],
                 },
                 1,

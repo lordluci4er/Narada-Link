@@ -17,10 +17,29 @@ const messageSchema = new mongoose.Schema(
       default: "",
     },
 
-    /// 🔥 NEW FIELD (READ STATUS)
+    /// 👁️ BASIC READ FLAG (quick check)
     seen: {
       type: Boolean,
       default: false,
+    },
+
+    /// 🔥 MESSAGE STATUS (WhatsApp style)
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "seen"],
+      default: "sent",
+    },
+
+    /// 🕒 DELIVERY TIME
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
+
+    /// 🕒 SEEN TIME
+    seenAt: {
+      type: Date,
+      default: null,
     },
   },
   {

@@ -89,14 +89,14 @@ class SocketService {
     });
   }
 
-  /// 🔥 AUTO REFRESH HELPER (🔥 IMPORTANT)
+  /// 🔥 AUTO REFRESH (FIXED VERSION)
   void onNewMessageRefresh(Function() callback) {
     if (socket == null) return;
 
-    socket!.off("newMessage_refresh");
+    socket!.off("newMessage"); // 🔥 correct cleanup
 
     socket!.on("newMessage", (_) {
-      callback(); // 👉 e.g. loadChats()
+      callback(); // 👉 e.g. loadChats() or loadMessages()
     });
   }
 
@@ -145,13 +145,12 @@ class SocketService {
     });
   }
 
-  /// 🔌 DISCONNECT
+  /// 🔌 DISCONNECT (FULL CLEANUP)
   void disconnect() {
     if (socket == null) return;
 
     socket!.off("receive_message");
-    socket!.off("newMessage");
-    socket!.off("newMessage_refresh");
+    socket!.off("newMessage"); // 🔥 important
     socket!.off("typing");
     socket!.off("online_users");
     socket!.off("userUpdated");

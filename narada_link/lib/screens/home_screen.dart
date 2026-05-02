@@ -45,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     /// 🔥 NAME UPDATE
-    socket.onUserUpdated((data) {
+    socket.onUserUpdated((_) {
       loadChats();
     });
   }
@@ -100,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (chats[index]['unreadCount'] ?? 0) + 1;
       }
     } else {
+      /// 🔥 NEW CHAT
       chats.insert(0, {
         'userId': otherUserId,
         'name': "Narada Link User",
@@ -116,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
         DateTime.parse(b['createdAt'])
             .compareTo(DateTime.parse(a['createdAt'])));
 
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -241,6 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return GestureDetector(
           onTap: () {
+            /// 🔥 RESET UNREAD
             chats[index]['unreadCount'] = 0;
 
             Navigator.push(
@@ -294,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment:
                         CrossAxisAlignment.start,
                     children: [
+                      /// NAME
                       Text(
                         name,
                         style: TextStyle(
@@ -306,6 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       const SizedBox(height: 4),
 
+                      /// MESSAGE + BADGE
                       Row(
                         children: [
                           Expanded(

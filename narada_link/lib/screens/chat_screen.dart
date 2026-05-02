@@ -34,39 +34,72 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
-    /// 🔥 LOAD FIRST
+    /// 🔥 LOAD MESSAGES
     loadMessages();
 
-    /// 🔥 MARK AS SEEN (VERY IMPORTANT)
+    /// 🔥 STATUS UPDATE
+    ApiService.markDelivered(widget.jwt);
     ApiService.markAsSeen(widget.userId, widget.jwt);
 
     /// 🔥 CONNECT SOCKET
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME LISTENER
+    /// 🔥 NEW MESSAGE LISTENER
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
       /// ❌ skip own message
-      if (senderId == widget.myId.toString()) return;
+      if (senderId == widget.myId) return;
 
       /// ✅ only current chat
       if (senderId == widget.userId) {
+        if (!mounted) return;
+
         setState(() {
           messages.add({
+            "_id": data['messageId'],
             "senderId": senderId,
             "receiverId": widget.myId,
             "text": data['text'],
             "createdAt": data['createdAt'] ??
                 DateTime.now().toIso8601String(),
-            "seen": false,
+            "status": data['status'] ?? "sent",
+            "seenAt": null,
           });
         });
 
         scrollToBottom();
 
-        /// 🔥 INSTANT SEEN UPDATE
+        /// 🔥 instant seen update
         ApiService.markAsSeen(widget.userId, widget.jwt);
+      }
+    });
+
+    /// 🔥 MESSAGE DELIVERED
+    socket.socket?.on("messageDelivered", (data) {
+      final index = messages.indexWhere(
+        (m) => m['_id'] == data['messageId'],
+      );
+
+      if (index != -1 && mounted) {
+        setState(() {
+          messages[index]['status'] = "delivered";
+        });
+      }
+    });
+
+    /// 🔥 MESSAGE SEEN
+    socket.socket?.on("messageSeen", (data) {
+      final index = messages.indexWhere(
+        (m) => m['_id'] == data['messageId'],
+      );
+
+      if (index != -1 && mounted) {
+        setState(() {
+          messages[index]['status'] = "seen";
+          messages[index]['seenAt'] =
+              DateTime.now().toIso8601String();
+        });
       }
     });
   }
@@ -119,23 +152,27 @@ class _ChatScreenState extends State<ChatScreen> {
 
     controller.clear();
 
+    final tempId =
+        DateTime.now().millisecondsSinceEpoch.toString();
+
     final newMsg = {
+      "_id": tempId, // temporary
       "senderId": widget.myId,
       "receiverId": widget.userId,
       "text": text,
       "createdAt": DateTime.now().toIso8601String(),
-      "seen": false,
+      "status": "sent",
+      "seenAt": null,
     };
 
-    /// 🔥 INSTANT UI
     setState(() => messages.add(newMsg));
 
     scrollToBottom();
 
-    /// 🔥 SOCKET
+    /// 🔥 SOCKET SEND
     socket.sendMessage(newMsg);
 
-    /// 🔥 API
+    /// 🔥 API SAVE
     await ApiService.sendMessage(
       widget.userId,
       text,
@@ -146,6 +183,9 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     socket.socket?.off("newMessage");
+    socket.socket?.off("messageDelivered");
+    socket.socket?.off("messageSeen");
+
     socket.disconnect();
     controller.dispose();
     scrollController.dispose();
@@ -168,7 +208,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
 
-      /// 🔥 APP BAR
       appBar: AppBar(
         title: Text(displayName),
         backgroundColor: AppColors.background,
@@ -184,7 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Center(child: CircularProgressIndicator()),
               )
 
-            /// 💤 EMPTY
+            /// 💤 EMPTY STATE
             else if (messages.isEmpty)
               const Expanded(
                 child: Center(
@@ -212,6 +251,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     return MessageBubble(
                       text: getText(m),
                       isMe: isMe,
+                      status: m['status'] ?? "sent",
+                      createdAt: m['createdAt'],
+                      seenAt: m['seenAt'],
                     );
                   },
                 ),

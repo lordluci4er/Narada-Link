@@ -151,7 +151,19 @@ class ApiService {
     }
   }
 
-  /// 🔥 MARK AS SEEN (NEW)
+  /// 🔥 MARK AS DELIVERED
+  static Future<void> markDelivered(String jwt) async {
+    try {
+      await http.put(
+        Uri.parse("$baseUrl/api/messages/delivered"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+        },
+      );
+    } catch (_) {}
+  }
+
+  /// 🔥 MARK AS SEEN
   static Future<void> markAsSeen(String userId, String jwt) async {
     try {
       await http.put(

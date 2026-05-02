@@ -5,7 +5,8 @@ import {
   getMessages,
   getRecentChats,
   getConversations,
-  markAsSeen, // 🔥 NEW
+  markAsSeen,
+  markAsDelivered,
 } from "../controllers/messageController.js";
 
 const router = express.Router();
@@ -22,7 +23,11 @@ router.get("/conversations", protect, getConversations);
 // GET /api/messages/recent
 router.get("/recent", protect, getRecentChats);
 
-/// 🔥 MARK AS SEEN (🔥 NEW)
+/// 🔥 MARK AS DELIVERED
+// PUT /api/messages/delivered
+router.put("/delivered", protect, markAsDelivered);
+
+/// 🔥 MARK AS SEEN
 // PUT /api/messages/seen/:userId
 router.put("/seen/:userId", protect, markAsSeen);
 
