@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // 🔥 NEW
 import '../utils/colors.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
@@ -63,10 +64,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// 🔥 TIME FORMATTER
-  String formatTime(String date) {
+  /// 🔥 SMART TIME FORMAT
+  String formatChatTime(String date) {
     final dt = DateTime.parse(date).toLocal();
-    return "${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
+    final now = DateTime.now();
+
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDay = DateTime(dt.year, dt.month, dt.day);
+
+    final difference = today.difference(messageDay).inDays;
+
+    if (difference == 0) {
+      return DateFormat('h:mm a').format(dt); // 10:45 PM
+    } else if (difference == 1) {
+      return "Yesterday";
+    } else {
+      return DateFormat('d MMM').format(dt); // 12 May
+    }
   }
 
   @override
@@ -236,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isMe ? "You: $lastMessageRaw" : lastMessageRaw;
 
         final time = chat['createdAt'] != null
-            ? formatTime(chat['createdAt'])
+            ? formatChatTime(chat['createdAt'])
             : "";
 
         return GestureDetector(
@@ -278,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(width: 12),
 
-                /// 🔥 TEXT CONTENT
+                /// 🔥 TEXT
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
