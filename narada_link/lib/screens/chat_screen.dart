@@ -34,15 +34,33 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 Always reload on incoming message
+    /// 🔥 REALTIME MESSAGE LISTENER (NO API CALL)
     socket.onMessage((data) {
-      loadMessages();
+      final senderId = data['senderId'].toString();
+      final receiverId = data['receiverId'].toString();
+
+      /// ✅ Only update if message belongs to this chat
+      if ((senderId == widget.userId &&
+              receiverId == widget.myId) ||
+          (senderId == widget.myId &&
+              receiverId == widget.userId)) {
+        setState(() {
+          messages.add({
+            "senderId": senderId,
+            "receiverId": receiverId,
+            "text": data['text'],
+            "createdAt": DateTime.now().toIso8601String(),
+          });
+        });
+
+        scrollToBottom();
+      }
     });
 
     loadMessages();
   }
 
-  /// 🔥 LOAD MESSAGES
+  /// 🔥 LOAD INITIAL MESSAGES (ONLY ONCE)
   void loadMessages() async {
     try {
       final data = await ApiService.getMessages(
@@ -50,7 +68,6 @@ class _ChatScreenState extends State<ChatScreen> {
         widget.jwt,
       );
 
-      /// ✅ Ensure proper type casting
       final formatted = List<Map<String, dynamic>>.from(data);
 
       setState(() {
@@ -73,38 +90,45 @@ class _ChatScreenState extends State<ChatScreen> {
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  /// 🔥 SEND MESSAGE
+  /// 🔥 SEND MESSAGE (INSTANT UI + SOCKET)
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
 
     controller.clear();
 
-    final success = await ApiService.sendMessage(
+    /// 🔥 INSTANT UI UPDATE (NO WAIT)
+    setState(() {
+      messages.add({
+        "senderId": widget.myId,
+        "receiverId": widget.userId,
+        "text": text,
+        "createdAt": DateTime.now().toIso8601String(),
+      });
+    });
+
+    scrollToBottom();
+
+    /// 🔥 SOCKET SEND (REALTIME)
+    socket.sendMessage(
+      senderId: widget.myId,
+      receiverId: widget.userId,
+      text: text,
+    );
+
+    /// 🔥 SAVE TO DB (BACKGROUND)
+    await ApiService.sendMessage(
       widget.userId,
       text,
       widget.jwt,
     );
-
-    if (!success) {
-      print("❌ Send failed");
-      return;
-    }
-
-    socket.sendMessage({
-      "senderId": widget.myId.toString(),
-      "receiverId": widget.userId.toString(),
-      "text": text,
-    });
-
-    loadMessages();
   }
 
   @override
@@ -115,14 +139,11 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  /// 🔥 SAFE TEXT EXTRACTOR (MAIN FIX)
+  /// 🔥 SAFE TEXT
   String getText(Map<String, dynamic> m) {
     final val = m['text'];
-
     if (val == null) return "";
-
     if (val is String) return val;
-
     return val.toString();
   }
 
@@ -155,9 +176,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     final m = messages[index];
 
                     final isMe =
-                        m['senderId'].toString() == widget.myId.toString();
+                        m['senderId'].toString() ==
+                            widget.myId.toString();
 
-                    final text = getText(m); // 🔥 FIXED
+                    final text = getText(m);
 
                     return MessageBubble(
                       text: text,

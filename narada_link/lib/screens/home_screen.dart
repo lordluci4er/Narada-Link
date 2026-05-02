@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // 🔥 NEW
+import 'package:intl/intl.dart';
 import '../utils/colors.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
@@ -23,26 +23,19 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final socket = SocketService();
 
-  List chats = [];
-  bool loading = true;
-
-  DateTime lastFetch = DateTime.now(); // 🔥 throttle
+  List chats = []; // 🔥 dynamic list
 
   @override
   void initState() {
     super.initState();
-    loadChats();
+
+    loadChats(); // initial load
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME (THROTTLED)
-    socket.onMessage((_) {
-      final now = DateTime.now();
-
-      if (now.difference(lastFetch).inSeconds > 2) {
-        lastFetch = now;
-        loadChats();
-      }
+    /// 🔥 REALTIME UPDATE (NO API SPAM)
+    socket.onMessage((data) {
+      updateChatList(data);
     });
   }
 
@@ -52,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// 🔥 LOAD CONVERSATIONS
+  /// 🔥 LOAD INITIAL CHATS
   void loadChats() async {
     final data = await ApiService.getConversations(widget.jwt);
 
@@ -60,8 +53,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       chats = data;
-      loading = false;
     });
+  }
+
+  /// 🔥 REALTIME CHAT UPDATE (GAME CHANGER)
+  void updateChatList(dynamic msg) {
+    final senderId = msg['senderId'];
+    final receiverId = msg['receiverId'];
+    final text = msg['text'];
+
+    final otherUserId =
+        senderId == widget.myId ? receiverId : senderId;
+
+    int index = chats.indexWhere(
+      (c) => c['userId'] == otherUserId,
+    );
+
+    if (index != -1) {
+      // 🔥 update existing chat
+      chats[index]['lastMessage'] = text;
+      chats[index]['createdAt'] =
+          DateTime.now().toIso8601String();
+    } else {
+      // 🔥 new chat add
+      chats.insert(0, {
+        'userId': otherUserId,
+        'username': "New User",
+        'lastMessage': text,
+        'createdAt': DateTime.now().toIso8601String(),
+        'senderId': senderId,
+      });
+    }
+
+    // 🔥 move latest chat on top
+    chats.sort((a, b) =>
+        DateTime.parse(b['createdAt'])
+            .compareTo(DateTime.parse(a['createdAt'])));
+
+    setState(() {});
   }
 
   /// 🔥 SMART TIME FORMAT
@@ -72,81 +101,25 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final messageDay = DateTime(dt.year, dt.month, dt.day);
 
-    final difference = today.difference(messageDay).inDays;
+    final diff = today.difference(messageDay).inDays;
 
-    if (difference == 0) {
-      return DateFormat('h:mm a').format(dt); // 10:45 PM
-    } else if (difference == 1) {
+    if (diff == 0) {
+      return DateFormat('h:mm a').format(dt);
+    } else if (diff == 1) {
       return "Yesterday";
     } else {
-      return DateFormat('d MMM').format(dt); // 12 May
+      return DateFormat('d MMM').format(dt);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isEmpty = chats.isEmpty;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// 🔥 HEADER
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Narada Link",
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.edit_rounded,
-                      size: 18,
-                      color: AppColors.primary,
-                    ),
-                  )
-                ],
-              ),
-            ),
-
-            /// 🔥 SUBTITLE
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                "Recent conversations",
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            /// 🔥 CONTENT
-            Expanded(
-              child: loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : isEmpty
-                      ? _emptyState(context)
-                      : _chatList(context),
-            ),
-          ],
-        ),
+        child: chats.isEmpty
+            ? _emptyState(context)
+            : _chatList(context),
       ),
     );
   }
@@ -156,73 +129,52 @@ class _HomeScreenState extends State<HomeScreen> {
   // ===========================
   Widget _emptyState(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(22),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 40,
+            color: AppColors.primary,
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            "No conversations yet",
+            style: TextStyle(
+              color: AppColors.primary,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SearchScreen(
+                    jwt: widget.jwt,
+                    myId: widget.myId,
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 10),
+              margin: const EdgeInsets.only(top: 20),
               decoration: BoxDecoration(
-                color: AppColors.card,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.chat_bubble_outline_rounded,
-                size: 40,
                 color: AppColors.primary,
+                borderRadius: BorderRadius.circular(20),
               ),
-            ),
-            const SizedBox(height: 25),
-            const Text(
-              "No conversations yet",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Find people and start your first conversation.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.secondary,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 25),
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SearchScreen(
-                      jwt: widget.jwt,
-                      myId: widget.myId,
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: const Text(
-                  "Find People",
-                  style: TextStyle(
-                    color: AppColors.background,
-                    fontWeight: FontWeight.w600,
-                  ),
+              child: const Text(
+                "Find People",
+                style: TextStyle(
+                  color: AppColors.background,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -231,20 +183,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // 🔥 CHAT LIST
   // ===========================
   Widget _chatList(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
       itemCount: chats.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final chat = chats[index];
 
         final userId = chat['userId'];
-        final username = (chat['username'] ?? "Unknown").toString();
+        final username =
+            (chat['username'] ?? "Unknown").toString();
         final avatar = chat['avatar'];
-        final lastMessageRaw = (chat['lastMessage'] ?? "").toString();
+        final lastMessageRaw =
+            (chat['lastMessage'] ?? "").toString();
 
         final isMe =
-            chat['senderId'].toString() == widget.myId.toString();
+            chat['senderId'].toString() == widget.myId;
 
         final lastMessage =
             isMe ? "You: $lastMessageRaw" : lastMessageRaw;
@@ -267,7 +220,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ).then((_) => loadChats());
           },
           child: Container(
-            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.card,
               borderRadius: BorderRadius.circular(16),
@@ -285,7 +239,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           username.isNotEmpty
                               ? username[0].toUpperCase()
                               : "U",
-                          style: const TextStyle(color: AppColors.primary),
+                          style: const TextStyle(
+                              color: AppColors.primary),
                         )
                       : null,
                 ),
@@ -295,13 +250,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 /// 🔥 TEXT
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       Text(
                         username,
                         style: const TextStyle(
                           color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 4),

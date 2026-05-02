@@ -4,7 +4,7 @@ const initSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("⚡ Connected:", socket.id);
 
-    /// 🔥 USER JOIN (room based)
+    /// 🔥 USER JOIN (ROOM BASED)
     socket.on("join", (userId) => {
       if (!userId) return;
 
@@ -14,36 +14,53 @@ const initSocket = (io) => {
       console.log("👤 Joined:", userIdStr);
     });
 
-    /// 🔥 NEW MESSAGE TRIGGER (NO DB SAVE HERE)
+    /// 🔥 SEND MESSAGE (REALTIME)
     socket.on("send_message", (data) => {
       try {
         const { senderId, receiverId, text } = data;
 
-        // ✅ validation
+        // ✅ VALIDATION
         if (!senderId || !receiverId || !text) {
-          return socket.emit("error", "Invalid data");
+          return socket.emit("error", "Invalid message data");
         }
 
         const senderIdStr = senderId.toString();
         const receiverIdStr = receiverId.toString();
 
-        // 🔥 SEND TO RECEIVER (with text)
-        io.to(receiverIdStr).emit("receive_message", {
+        const payload = {
           senderId: senderIdStr,
           receiverId: receiverIdStr,
-          text: text, // ✅ FIXED (MAIN ISSUE)
-        });
+          text: text,
+          createdAt: new Date().toISOString(),
+        };
 
-        // 🔥 optional debug log
-        console.log("📨 Message Triggered:", {
-          from: senderIdStr,
-          to: receiverIdStr,
-          text,
-        });
+        /// 🔥 SEND TO RECEIVER
+        io.to(receiverIdStr).emit("receive_message", payload);
+
+        /// 🔥 SEND BACK TO SENDER (FOR INSTANT UI SYNC)
+        io.to(senderIdStr).emit("receive_message", payload);
+
+        console.log("📨 Message Sent:", payload);
 
       } catch (error) {
         console.error("❌ Socket Error:", error.message);
-        socket.emit("error", "Socket failed");
+        socket.emit("error", "Message failed");
+      }
+    });
+
+    /// 🔥 TYPING (OPTIONAL FEATURE)
+    socket.on("typing", (data) => {
+      try {
+        const { senderId, receiverId } = data;
+
+        if (!senderId || !receiverId) return;
+
+        io.to(receiverId.toString()).emit("typing", {
+          senderId: senderId.toString(),
+        });
+
+      } catch (error) {
+        console.error("❌ Typing Error:", error.message);
       }
     });
 
