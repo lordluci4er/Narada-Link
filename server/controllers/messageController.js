@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import admin from "../config/firebaseAdmin.js";
 
-/// 🔥 SEND MESSAGE (STATUS = SENT)
+/// 🔥 SEND MESSAGE
 export const sendMessage = async (req, res) => {
   try {
     const senderId = (req.user?.id || req.user).toString();
@@ -15,7 +15,6 @@ export const sendMessage = async (req, res) => {
 
     const receiverIdStr = receiverId.toString();
 
-    /// 🔥 SAVE MESSAGE
     const message = await Message.create({
       senderId,
       receiverId: receiverIdStr,
@@ -25,10 +24,9 @@ export const sendMessage = async (req, res) => {
     });
 
     const sender = await User.findById(senderId);
-
     const io = req.app.get("io");
 
-    /// 🔥 REALTIME MESSAGE
+    /// 🔥 REALTIME
     io.to(receiverIdStr).emit("newMessage", {
       messageId: message._id,
       senderId,
@@ -97,7 +95,7 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS DELIVERED (FIXED)
+/// 🔥 MARK AS DELIVERED
 export const markAsDelivered = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -122,7 +120,6 @@ export const markAsDelivered = async (req, res) => {
 
     const io = req.app.get("io");
 
-    /// 🔥 IMPORTANT FIX → sender को notify करो
     messages.forEach((msg) => {
       io.to(msg.senderId).emit("messageDelivered", {
         messageId: msg._id,
@@ -138,7 +135,7 @@ export const markAsDelivered = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS SEEN (FIXED)
+/// 🔥 MARK AS SEEN
 export const markAsSeen = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -166,7 +163,6 @@ export const markAsSeen = async (req, res) => {
 
     const io = req.app.get("io");
 
-    /// 🔥 IMPORTANT FIX → messageId भेजना जरूरी
     messages.forEach((msg) => {
       io.to(userId).emit("messageSeen", {
         messageId: msg._id,
@@ -178,6 +174,54 @@ export const markAsSeen = async (req, res) => {
   } catch (err) {
     console.error("Seen Error:", err);
     res.status(500).json({ msg: "Error updating seen" });
+  }
+};
+
+
+/// 🔥 GET RECENT CHATS (✅ FIX ADDED BACK)
+export const getRecentChats = async (req, res) => {
+  try {
+    const userId = (req.user?.id || req.user).toString();
+
+    const chats = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$senderId", userId] },
+              "$receiverId",
+              "$senderId",
+            ],
+          },
+          lastMessage: { $first: "$text" },
+          createdAt: { $first: "$createdAt" },
+        },
+      },
+
+      {
+        $addFields: {
+          lastMessage: { $ifNull: ["$lastMessage", ""] },
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    res.json(chats);
+
+  } catch (err) {
+    console.error("Recent Chats Error:", err);
+    res.status(500).json({ msg: "Server error" });
   }
 };
 
