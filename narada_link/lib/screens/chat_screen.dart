@@ -34,48 +34,43 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
-    /// 🔥 LOAD MESSAGES
     loadMessages();
 
     /// 🔥 STATUS UPDATE
     ApiService.markDelivered(widget.jwt);
     ApiService.markAsSeen(widget.userId, widget.jwt);
 
-    /// 🔥 CONNECT SOCKET
     socket.connect(userId: widget.myId);
 
-    /// 🔥 NEW MESSAGE LISTENER
+    /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
-      /// ❌ skip own message
       if (senderId == widget.myId) return;
 
-      /// ✅ only current chat
       if (senderId == widget.userId) {
         if (!mounted) return;
 
-        setState(() {
-          messages.add({
-            "_id": data['messageId'],
-            "senderId": senderId,
-            "receiverId": widget.myId,
-            "text": data['text'],
-            "createdAt": data['createdAt'] ??
-                DateTime.now().toIso8601String(),
-            "status": data['status'] ?? "sent",
-            "seenAt": null,
-          });
-        });
+        final msg = {
+          "_id": data['messageId'],
+          "senderId": senderId,
+          "receiverId": widget.myId,
+          "text": data['text'],
+          "createdAt": data['createdAt'] ??
+              DateTime.now().toIso8601String(),
+          "status": data['status'] ?? "sent",
+          "seenAt": null,
+        };
+
+        setState(() => messages.add(msg));
 
         scrollToBottom();
 
-        /// 🔥 instant seen update
         ApiService.markAsSeen(widget.userId, widget.jwt);
       }
     });
 
-    /// 🔥 MESSAGE DELIVERED
+    /// 🔥 DELIVERED
     socket.socket?.on("messageDelivered", (data) {
       final index = messages.indexWhere(
         (m) => m['_id'] == data['messageId'],
@@ -88,7 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    /// 🔥 MESSAGE SEEN
+    /// 🔥 SEEN
     socket.socket?.on("messageSeen", (data) {
       final index = messages.indexWhere(
         (m) => m['_id'] == data['messageId'],
@@ -104,7 +99,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 LOAD MESSAGES
+  /// 🔥 LOAD
   void loadMessages() async {
     setState(() => loading = true);
 
@@ -114,12 +109,10 @@ class _ChatScreenState extends State<ChatScreen> {
         widget.jwt,
       );
 
-      final formatted = List<Map<String, dynamic>>.from(data);
-
       if (!mounted) return;
 
       setState(() {
-        messages = formatted;
+        messages = List<Map<String, dynamic>>.from(data);
         loading = false;
       });
 
@@ -132,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🔥 AUTO SCROLL
+  /// 🔥 SCROLL
   void scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients) {
@@ -145,7 +138,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SEND MESSAGE
+  /// 🔥 SEND
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
@@ -156,7 +149,7 @@ class _ChatScreenState extends State<ChatScreen> {
         DateTime.now().millisecondsSinceEpoch.toString();
 
     final newMsg = {
-      "_id": tempId, // temporary
+      "_id": tempId,
       "senderId": widget.myId,
       "receiverId": widget.userId,
       "text": text,
@@ -169,10 +162,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     scrollToBottom();
 
-    /// 🔥 SOCKET SEND
     socket.sendMessage(newMsg);
 
-    /// 🔥 API SAVE
     await ApiService.sendMessage(
       widget.userId,
       text,
@@ -192,12 +183,19 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  /// 🔥 SAFE TEXT
   String getText(Map<String, dynamic> m) {
     final val = m['text'];
     if (val == null) return "";
-    if (val is String) return val;
     return val.toString();
+  }
+
+  /// 🔥 SMART SEEN TEXT
+  String getSeenText(String seenAt) {
+    final diff = DateTime.now().difference(DateTime.parse(seenAt));
+
+    if (diff.inSeconds < 30) return "👀 Seen just now";
+    if (diff.inMinutes < 5) return "👀 Active ${diff.inMinutes}m ago";
+    return "💤 Seen earlier today";
   }
 
   @override
@@ -205,36 +203,40 @@ class _ChatScreenState extends State<ChatScreen> {
     final displayName =
         (widget.name ?? "Narada Link User").toString();
 
+    /// 🔥 LAST SEEN MESSAGE (ONLY MY LAST MSG)
+    final lastSeenMsg = messages.isNotEmpty
+        ? messages.lastWhere(
+            (m) =>
+                m['senderId'] == widget.myId &&
+                m['status'] == "seen",
+            orElse: () => {},
+          )
+        : {};
+
     return Scaffold(
       backgroundColor: AppColors.background,
-
       appBar: AppBar(
         title: Text(displayName),
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
-
       body: SafeArea(
         child: Column(
           children: [
-            /// 🔄 LOADING
             if (loading)
               const Expanded(
                 child: Center(child: CircularProgressIndicator()),
               )
-
-            /// 💤 EMPTY STATE
             else if (messages.isEmpty)
               const Expanded(
                 child: Center(
                   child: Text(
                     "Start conversation 👋",
-                    style: TextStyle(color: AppColors.secondary),
+                    style:
+                        TextStyle(color: AppColors.secondary),
                   ),
                 ),
               )
-
-            /// 💬 CHAT LIST
             else
               Expanded(
                 child: ListView.builder(
@@ -246,7 +248,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                     final isMe =
                         m['senderId'].toString() ==
-                            widget.myId.toString();
+                            widget.myId;
 
                     return MessageBubble(
                       text: getText(m),
@@ -259,7 +261,25 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
 
-            /// ✍️ INPUT
+            /// 🔥 SINGLE SEEN TEXT (ONLY LAST MESSAGE)
+            if (lastSeenMsg.isNotEmpty &&
+                lastSeenMsg['seenAt'] != null)
+              Padding(
+                padding: const EdgeInsets.only(
+                    right: 16, bottom: 4),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    getSeenText(lastSeenMsg['seenAt']),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
+
+            /// INPUT
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 10, vertical: 8),
@@ -273,8 +293,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       decoration: const InputDecoration(
                         hintText: "Type a message...",
-                        hintStyle:
-                            TextStyle(color: AppColors.secondary),
+                        hintStyle: TextStyle(
+                          color: AppColors.secondary,
+                        ),
                       ),
                     ),
                   ),

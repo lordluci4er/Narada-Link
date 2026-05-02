@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 class MessageBubble extends StatelessWidget {
   final String text;
   final bool isMe;
-
-  /// 🔥 NEW
-  final String? status; // sent / delivered / seen
+  final String? status;
   final String? createdAt;
   final String? seenAt;
 
@@ -18,17 +16,35 @@ class MessageBubble extends StatelessWidget {
     this.seenAt,
   });
 
-  /// 🔥 TICK SYSTEM
+  /// 🔥 GRADIENT TICKS (FINAL)
   Widget buildTicks(String? status) {
     if (!isMe) return const SizedBox();
 
     if (status == "sent") {
       return const Icon(Icons.check, size: 16, color: Colors.grey);
-    } else if (status == "delivered") {
-      return const Icon(Icons.done_all, size: 16, color: Colors.grey);
-    } else if (status == "seen") {
-      return const Icon(Icons.done_all, size: 16, color: Colors.blue);
     }
+
+    if (status == "delivered") {
+      return ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          colors: [Colors.purple, Colors.deepPurple],
+        ).createShader(bounds),
+        child: const Icon(
+          Icons.done_all,
+          size: 16,
+          color: Colors.white,
+        ),
+      );
+    }
+
+    if (status == "seen") {
+      return const Icon(
+        Icons.done_all,
+        size: 16,
+        color: Colors.blueAccent,
+      );
+    }
+
     return const SizedBox();
   }
 
@@ -48,7 +64,7 @@ class MessageBubble extends StatelessWidget {
     }
   }
 
-  /// 🔥 SEEN TIME (INSTAGRAM STYLE)
+  /// 🔥 SMART SEEN TEXT (UPGRADED)
   String seenAgo(String? seenAt) {
     if (seenAt == null) return "";
 
@@ -56,11 +72,11 @@ class MessageBubble extends StatelessWidget {
       final diff =
           DateTime.now().difference(DateTime.parse(seenAt));
 
-      if (diff.inMinutes < 1) return "Seen just now";
-      if (diff.inMinutes < 60) return "Seen ${diff.inMinutes}m ago";
-      if (diff.inHours < 24) return "Seen ${diff.inHours}h ago";
+      if (diff.inMinutes < 1) return "👀 Seen just now";
+      if (diff.inMinutes < 60) return "👀 Seen ${diff.inMinutes}m ago";
+      if (diff.inHours < 24) return "👀 Active ${diff.inHours}h ago";
 
-      return "Seen ${diff.inDays}d ago";
+      return "💤 Seen earlier";
     } catch (_) {
       return "";
     }
@@ -71,7 +87,8 @@ class MessageBubble extends StatelessWidget {
     return Align(
       alignment:
           isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         margin:
             const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
         padding:
@@ -100,7 +117,7 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
 
             /// 🔥 TIME + TICKS
             Row(
@@ -115,12 +132,12 @@ class MessageBubble extends StatelessWidget {
                         : Colors.black54,
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 5),
                 buildTicks(status),
               ],
             ),
 
-            /// 🔥 SEEN TEXT (ONLY FOR SENDER)
+            /// 🔥 SEEN TEXT (ONLY SENDER)
             if (isMe && status == "seen")
               Padding(
                 padding: const EdgeInsets.only(top: 2),

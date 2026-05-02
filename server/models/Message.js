@@ -2,32 +2,39 @@ import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema(
   {
+    /// 👤 SENDER
     senderId: {
       type: String,
       required: true,
+      index: true,
     },
 
+    /// 👤 RECEIVER
     receiverId: {
       type: String,
       required: true,
+      index: true,
     },
 
+    /// 💬 MESSAGE TEXT
     text: {
       type: String,
       default: "",
+      trim: true,
     },
 
-    /// 👁️ BASIC READ FLAG (quick check)
+    /// 👁️ QUICK FLAG (optional but useful for queries)
     seen: {
       type: Boolean,
       default: false,
     },
 
-    /// 🔥 MESSAGE STATUS (WhatsApp style)
+    /// 🔥 STATUS SYSTEM (MAIN LOGIC)
     status: {
       type: String,
       enum: ["sent", "delivered", "seen"],
       default: "sent",
+      index: true,
     },
 
     /// 🕒 DELIVERY TIME
@@ -43,7 +50,7 @@ const messageSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // createdAt, updatedAt
   }
 );
 

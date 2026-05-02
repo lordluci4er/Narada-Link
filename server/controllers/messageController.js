@@ -15,18 +15,21 @@ export const sendMessage = async (req, res) => {
 
     const receiverIdStr = receiverId.toString();
 
+    /// ✅ SAVE MESSAGE
     const message = await Message.create({
       senderId,
       receiverId: receiverIdStr,
       text,
       seen: false,
       status: "sent",
+      deliveredAt: null,
+      seenAt: null,
     });
 
     const sender = await User.findById(senderId);
     const io = req.app.get("io");
 
-    /// 🔥 REALTIME
+    /// 🔥 REALTIME MESSAGE
     io.to(receiverIdStr).emit("newMessage", {
       messageId: message._id,
       senderId,
@@ -37,7 +40,7 @@ export const sendMessage = async (req, res) => {
       status: "sent",
     });
 
-    /// 🔔 PUSH
+    /// 🔔 PUSH NOTIFICATION
     const receiver = await User.findById(receiverIdStr);
 
     if (receiver?.fcmToken) {
@@ -95,16 +98,18 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS DELIVERED
+/// 🔥 MARK AS DELIVERED (IMPROVED)
 export const markAsDelivered = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
 
+    /// 🔥 GET MESSAGES FIRST
     const messages = await Message.find({
       receiverId: myId,
       status: "sent",
     });
 
+    /// 🔥 UPDATE STATUS
     await Message.updateMany(
       {
         receiverId: myId,
@@ -120,6 +125,7 @@ export const markAsDelivered = async (req, res) => {
 
     const io = req.app.get("io");
 
+    /// 🔥 NOTIFY SENDERS
     messages.forEach((msg) => {
       io.to(msg.senderId).emit("messageDelivered", {
         messageId: msg._id,
@@ -135,18 +141,20 @@ export const markAsDelivered = async (req, res) => {
 };
 
 
-/// 🔥 MARK AS SEEN
+/// 🔥 MARK AS SEEN (FINAL FIXED)
 export const markAsSeen = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
     const userId = req.params.userId.toString();
 
+    /// 🔥 GET MESSAGES
     const messages = await Message.find({
       senderId: userId,
       receiverId: myId,
       status: { $ne: "seen" },
     });
 
+    /// 🔥 UPDATE
     await Message.updateMany(
       {
         senderId: userId,
@@ -163,6 +171,7 @@ export const markAsSeen = async (req, res) => {
 
     const io = req.app.get("io");
 
+    /// 🔥 NOTIFY SENDER
     messages.forEach((msg) => {
       io.to(userId).emit("messageSeen", {
         messageId: msg._id,
@@ -178,7 +187,7 @@ export const markAsSeen = async (req, res) => {
 };
 
 
-/// 🔥 GET RECENT CHATS (✅ FIX ADDED BACK)
+/// 🔥 GET RECENT CHATS
 export const getRecentChats = async (req, res) => {
   try {
     const userId = (req.user?.id || req.user).toString();
@@ -226,7 +235,7 @@ export const getRecentChats = async (req, res) => {
 };
 
 
-/// 🔥 GET CONVERSATIONS
+/// 🔥 GET CONVERSATIONS (WITH UNREAD COUNT)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -240,6 +249,7 @@ export const getConversations = async (req, res) => {
           ],
         },
       },
+
       { $sort: { createdAt: -1 } },
 
       {
@@ -254,6 +264,7 @@ export const getConversations = async (req, res) => {
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
 
+          /// 🔥 UNREAD COUNT
           unreadCount: {
             $sum: {
               $cond: [
