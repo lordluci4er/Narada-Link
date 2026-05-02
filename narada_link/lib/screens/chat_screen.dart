@@ -41,21 +41,18 @@ class _ChatScreenState extends State<ChatScreen> {
     loadMessages();
     loadUserStatus();
 
-    /// 🔥 STATUS UPDATE
     ApiService.markDelivered(widget.jwt);
     ApiService.markAsSeen(widget.userId, widget.jwt);
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME MESSAGE
+    /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
       if (senderId == widget.myId) return;
 
-      if (senderId == widget.userId) {
-        if (!mounted) return;
-
+      if (senderId == widget.userId && mounted) {
         final msg = {
           "_id": data['messageId'],
           "senderId": senderId,
@@ -68,7 +65,6 @@ class _ChatScreenState extends State<ChatScreen> {
         };
 
         setState(() => messages.add(msg));
-
         scrollToBottom();
 
         ApiService.markAsSeen(widget.userId, widget.jwt);
@@ -77,22 +73,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
     /// 🔥 DELIVERED
     socket.socket?.on("messageDelivered", (data) {
-      final index = messages.indexWhere(
-        (m) => m['_id'] == data['messageId'],
-      );
+      final index =
+          messages.indexWhere((m) => m['_id'] == data['messageId']);
 
       if (index != -1 && mounted) {
-        setState(() {
-          messages[index]['status'] = "delivered";
-        });
+        setState(() => messages[index]['status'] = "delivered");
       }
     });
 
     /// 🔥 SEEN
     socket.socket?.on("messageSeen", (data) {
-      final index = messages.indexWhere(
-        (m) => m['_id'] == data['messageId'],
-      );
+      final index =
+          messages.indexWhere((m) => m['_id'] == data['messageId']);
 
       if (index != -1 && mounted) {
         setState(() {
@@ -103,7 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    /// 🟢 ONLINE STATUS SOCKET
+    /// 🟢 USER STATUS SOCKET
     socket.socket?.on("userStatus", (data) {
       if (data['userId'] == widget.userId && mounted) {
         setState(() {
@@ -119,10 +111,8 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => loading = true);
 
     try {
-      final data = await ApiService.getMessages(
-        widget.userId,
-        widget.jwt,
-      );
+      final data =
+          await ApiService.getMessages(widget.userId, widget.jwt);
 
       if (!mounted) return;
 
@@ -138,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🟢 LOAD USER STATUS (API fallback)
+  /// 🟢 USER STATUS (API fallback)
   void loadUserStatus() async {
     final data =
         await ApiService.getUserStatus(widget.userId, widget.jwt);
@@ -151,7 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🔥 SCROLL
+  /// 🔽 SCROLL
   void scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients) {
@@ -164,7 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 🔥 SEND
+  /// ✉️ SEND
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
@@ -185,7 +175,6 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     setState(() => messages.add(newMsg));
-
     scrollToBottom();
 
     socket.sendMessage(newMsg);
@@ -210,12 +199,12 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  /// 🧠 SAFE TEXT
   String getText(Map<String, dynamic> m) {
-    final val = m['text'];
-    return val?.toString() ?? "";
+    return m['text']?.toString() ?? "";
   }
 
-  /// 👀 SMART SEEN TEXT
+  /// 👀 SEEN TEXT
   String getSeenText(String seenAt) {
     final diff =
         DateTime.now().difference(DateTime.parse(seenAt));
@@ -227,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return "💤 Seen earlier today";
   }
 
-  /// 🟢 ONLINE STATUS FORMAT
+  /// 🟢 STATUS TEXT
   String getStatus() {
     if (isOnline) return "🟢 Online";
 
@@ -250,23 +239,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final displayName =
         (widget.name ?? "Narada Link User").toString();
 
-    /// 🔥 LAST SEEN MESSAGE
-    final lastSeenMsg = messages.isNotEmpty
-        ? messages.lastWhere(
-            (m) =>
-                m['senderId'] == widget.myId &&
-                m['status'] == "seen",
-            orElse: () => {},
-          )
-        : {};
-
     return Scaffold(
       backgroundColor: AppColors.background,
 
-      /// 🔥 APP BAR WITH STATUS
+      /// 🔥 APPBAR (CLEAN UI)
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -309,35 +289,41 @@ class _ChatScreenState extends State<ChatScreen> {
                     final m = messages[index];
 
                     final isMe =
-                        m['senderId'].toString() ==
-                            widget.myId;
+                        m['senderId'].toString() == widget.myId;
 
-                    return MessageBubble(
-                      text: getText(m),
-                      isMe: isMe,
-                      status: m['status'] ?? "sent",
-                      createdAt: m['createdAt'],
-                      seenAt: m['seenAt'],
+                    final isLastMessage =
+                        index == messages.length - 1;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        MessageBubble(
+                          text: getText(m),
+                          isMe: isMe,
+                          status: m['status'] ?? "sent",
+                          createdAt: m['createdAt'],
+                          seenAt: m['seenAt'],
+                        ),
+
+                        /// 🔥 ONLY LAST MESSAGE SEEN TEXT
+                        if (isMe &&
+                            isLastMessage &&
+                            m['status'] == "seen" &&
+                            m['seenAt'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                right: 16, bottom: 4),
+                            child: Text(
+                              getSeenText(m['seenAt']),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   },
-                ),
-              ),
-
-            /// 🔥 LAST SEEN TEXT
-            if (lastSeenMsg.isNotEmpty &&
-                lastSeenMsg['seenAt'] != null)
-              Padding(
-                padding: const EdgeInsets.only(
-                    right: 16, bottom: 4),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    getSeenText(lastSeenMsg['seenAt']),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                    ),
-                  ),
                 ),
               ),
 

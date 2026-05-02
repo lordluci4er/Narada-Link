@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 class MessageBubble extends StatelessWidget {
   final String text;
   final bool isMe;
+
+  /// 🔥 STATUS SYSTEM
   final String? status;
   final String? createdAt;
-  final String? seenAt;
+  final String? seenAt; // ✅ FIX ADDED
 
   const MessageBubble({
     super.key,
@@ -13,15 +15,19 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     this.status,
     this.createdAt,
-    this.seenAt,
+    this.seenAt, // ✅ REQUIRED FOR FUTURE USE
   });
 
-  /// 🔥 GRADIENT TICKS (FINAL)
+  /// 🔥 GRADIENT TICKS
   Widget buildTicks(String? status) {
     if (!isMe) return const SizedBox();
 
     if (status == "sent") {
-      return const Icon(Icons.check, size: 16, color: Colors.grey);
+      return const Icon(
+        Icons.check,
+        size: 16,
+        color: Colors.grey,
+      );
     }
 
     if (status == "delivered") {
@@ -50,7 +56,7 @@ class MessageBubble extends StatelessWidget {
 
   /// 🔥 TIME FORMAT
   String formatTime(String? date) {
-    if (date == null) return "";
+    if (date == null || date.isEmpty) return "";
 
     try {
       final dt = DateTime.parse(date).toLocal();
@@ -64,19 +70,23 @@ class MessageBubble extends StatelessWidget {
     }
   }
 
-  /// 🔥 SMART SEEN TEXT (UPGRADED)
-  String seenAgo(String? seenAt) {
+  /// 🔥 (OPTIONAL) SMART SEEN — NOT USED HERE
+  /// 👉 ChatScreen me use hoga (last message only)
+  String smartSeen(String? seenAt) {
     if (seenAt == null) return "";
 
     try {
       final diff =
           DateTime.now().difference(DateTime.parse(seenAt));
 
-      if (diff.inMinutes < 1) return "👀 Seen just now";
-      if (diff.inMinutes < 60) return "👀 Seen ${diff.inMinutes}m ago";
-      if (diff.inHours < 24) return "👀 Active ${diff.inHours}h ago";
+      if (diff.inSeconds < 10) return "👀 Seen just now";
+      if (diff.inMinutes < 1) return "👀 Seen few sec ago";
+      if (diff.inMinutes < 60)
+        return "👀 Seen ${diff.inMinutes}m ago";
+      if (diff.inHours < 24)
+        return "👀 Seen ${diff.inHours}h ago";
 
-      return "💤 Seen earlier";
+      return "Seen earlier";
     } catch (_) {
       return "";
     }
@@ -84,16 +94,22 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final safeStatus = status ?? "sent";
+
     return Align(
       alignment:
           isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
+
         margin:
             const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+
         padding:
             const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+
         constraints: const BoxConstraints(maxWidth: 260),
+
         decoration: BoxDecoration(
           color: isMe
               ? const Color(0xFF2C2C2C)
@@ -105,10 +121,11 @@ class MessageBubble extends StatelessWidget {
             bottomRight: Radius.circular(isMe ? 4 : 14),
           ),
         ),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            /// 🔥 MESSAGE TEXT
+            /// 💬 TEXT
             Text(
               text,
               style: TextStyle(
@@ -119,7 +136,7 @@ class MessageBubble extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            /// 🔥 TIME + TICKS
+            /// ⏱ TIME + TICKS
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -133,22 +150,13 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 5),
-                buildTicks(status),
+                buildTicks(safeStatus),
               ],
             ),
 
-            /// 🔥 SEEN TEXT (ONLY SENDER)
-            if (isMe && status == "seen")
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  seenAgo(seenAt),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
+            /// ❌ IMPORTANT:
+            /// 👉 seen text yaha nahi dikhana
+            /// 👉 ChatScreen me last message ke niche show hoga
           ],
         ),
       ),

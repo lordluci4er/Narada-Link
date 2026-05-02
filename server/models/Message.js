@@ -16,20 +16,21 @@ const messageSchema = new mongoose.Schema(
       index: true,
     },
 
-    /// 💬 MESSAGE TEXT
+    /// 💬 TEXT
     text: {
       type: String,
       default: "",
       trim: true,
     },
 
-    /// 👁️ QUICK FLAG (optional but useful for queries)
+    /// 👁️ QUICK FLAG
     seen: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
-    /// 🔥 STATUS SYSTEM (MAIN LOGIC)
+    /// 🔥 STATUS SYSTEM
     status: {
       type: String,
       enum: ["sent", "delivered", "seen"],
@@ -37,13 +38,12 @@ const messageSchema = new mongoose.Schema(
       index: true,
     },
 
-    /// 🕒 DELIVERY TIME
+    /// 🕒 TIMES
     deliveredAt: {
       type: Date,
       default: null,
     },
 
-    /// 🕒 SEEN TIME
     seenAt: {
       type: Date,
       default: null,
@@ -53,5 +53,16 @@ const messageSchema = new mongoose.Schema(
     timestamps: true, // createdAt, updatedAt
   }
 );
+
+/// 🔥🔥🔥 COMPOUND INDEXES (REAL PERFORMANCE BOOST)
+
+/// chat fetch fast
+messageSchema.index({ senderId: 1, receiverId: 1, createdAt: 1 });
+
+/// unread count fast
+messageSchema.index({ receiverId: 1, status: 1 });
+
+/// reverse chat queries
+messageSchema.index({ receiverId: 1, senderId: 1, createdAt: 1 });
 
 export default mongoose.model("Message", messageSchema);
