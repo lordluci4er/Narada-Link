@@ -8,11 +8,11 @@ const userSchema = new mongoose.Schema(
       unique: true,
     },
 
-    /// 🔥 FULL NAME (NEW FIELD)
+    /// 🔥 FULL NAME (DEFAULT FIXED)
     name: {
       type: String,
       trim: true,
-      default: null,
+      default: "Narada Link User", // ✅ GLOBAL DEFAULT NAME
     },
 
     username: {
@@ -44,13 +44,13 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    /// 🟢 ONLINE STATUS (future use)
+    /// 🟢 ONLINE STATUS
     isOnline: {
       type: Boolean,
       default: false,
     },
 
-    /// ⏱ LAST SEEN (future use)
+    /// ⏱ LAST SEEN
     lastSeen: {
       type: Date,
       default: null,

@@ -12,7 +12,7 @@ class SocketService {
     required String userId,
     String? token,
   }) {
-    // 🔥 prevent multiple connections
+    /// 🔥 prevent multiple connections
     if (socket != null && socket!.connected) return;
 
     socket = IO.io(
@@ -35,10 +35,11 @@ class SocketService {
       isConnected = true;
       print("🟢 Socket Connected");
 
+      /// 🔥 join room
       socket!.emit("join", userId.toString());
     });
 
-    /// 🔁 reconnect pe join fir se
+    /// 🔁 reconnect pe fir join
     socket!.onReconnect((_) {
       print("🔁 Reconnected");
       socket!.emit("join", userId.toString());
@@ -58,65 +59,63 @@ class SocketService {
     });
   }
 
-  /// 💬 SEND MESSAGE
-  void sendMessage({
-    required String senderId,
-    required String receiverId,
-    required String text,
-  }) {
-    if (!isConnected) {
+  /// 💬 SEND MESSAGE (🔥 MAP VERSION)
+  void sendMessage(Map<String, dynamic> data) {
+    if (!(socket?.connected ?? false)) {
       print("⚠️ Socket not connected");
       return;
     }
 
-    socket!.emit("send_message", {
-      "senderId": senderId,
-      "receiverId": receiverId,
-      "text": text,
-    });
+    socket!.emit("send_message", data);
   }
 
   /// 📥 RECEIVE MESSAGE
   void onMessage(Function(dynamic) callback) {
-    socket?.off("receive_message"); // 🔥 prevent duplicate
+    if (socket == null) return;
 
-    socket?.on("receive_message", (data) {
+    socket!.off("receive_message"); // 🔥 avoid duplicate listener
+
+    socket!.on("receive_message", (data) {
       callback(data);
     });
   }
 
-  /// ✍️ TYPING SEND
+  /// ✍️ SEND TYPING
   void sendTyping({
     required String senderId,
     required String receiverId,
   }) {
-    if (!isConnected) return;
+    if (!(socket?.connected ?? false)) return;
 
-    socket?.emit("typing", {
+    socket!.emit("typing", {
       "senderId": senderId,
       "receiverId": receiverId,
     });
   }
 
-  /// ✍️ TYPING LISTEN
+  /// ✍️ LISTEN TYPING
   void onTyping(Function(dynamic) callback) {
-    socket?.off("typing");
+    if (socket == null) return;
 
-    socket?.on("typing", (data) {
+    socket!.off("typing");
+
+    socket!.on("typing", (data) {
       callback(data);
     });
   }
 
-  /// 🟢 ONLINE USERS (optional future)
+  /// 🟢 ONLINE USERS (future ready)
   void onOnlineUsers(Function(dynamic) callback) {
-    socket?.off("online_users");
+    if (socket == null) return;
 
-    socket?.on("online_users", (data) {
+    socket!.off("online_users");
+
+    socket!.on("online_users", (data) {
       callback(data);
     });
   }
 
-  /// 🔌 DISCONNECT
+  /// 🔌 DISCONNECT (CLEANUP)
   void disconnect() {
     if (socket == null) return;
 

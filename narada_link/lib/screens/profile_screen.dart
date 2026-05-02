@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/colors.dart';
-import 'edit_profile_screen.dart'; // 🔥 IMPORTANT
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String jwt;
@@ -81,10 +81,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    final name = (user?['name'] ?? "No Name").toString();
-    final username = (user?['username'] ?? "").toString();
-    final email = (user?['email'] ?? "").toString();
-    final avatar = (user?['avatar'] ?? "").toString();
+    /// 🔥 SAFE DATA (FINAL FIX)
+    final name =
+        (user?['name'] ?? "Narada Link User").toString();
+
+    final username =
+        (user?['username'] ?? "").toString();
+
+    final email =
+        (user?['email'] ?? "").toString();
+
+    final avatar =
+        (user?['avatar'] ?? "").toString();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -95,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
 
-        /// 🔥 EDIT BUTTON (FIXED)
+        /// 🔥 EDIT BUTTON
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -104,13 +112,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => EditProfileScreen(
-                    jwt: widget.jwt,        // ✅ FIX
-                    currentName: name,      // ✅ FIX
+                    jwt: widget.jwt,
+                    currentName: name,
                   ),
                 ),
               ).then((updated) {
                 if (updated == true) {
-                  fetchUser(); // 🔥 refresh after edit
+                  fetchUser();
                 }
               });
             },
@@ -165,7 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             /// 🔥 USERNAME
             Center(
               child: Text(
-                "@$username",
+                username.isNotEmpty ? "@$username" : "",
                 style: const TextStyle(
                   color: AppColors.secondary,
                   fontSize: 14,
@@ -200,7 +208,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _infoRow("Name", name),
                   const Divider(),
-                  _infoRow("Username", "@$username"),
+                  _infoRow(
+                    "Username",
+                    username.isNotEmpty ? "@$username" : "-",
+                  ),
                   if (email.isNotEmpty) ...[
                     const Divider(),
                     _infoRow("Email", email),

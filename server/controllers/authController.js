@@ -8,7 +8,7 @@ export const googleAuth = async (req, res) => {
 
     const { token } = req.body;
 
-    // ❗ Token check
+    /// ❗ Token check
     if (!token) {
       console.log("❌ No token received");
       return res.status(400).json({ msg: "Token is required" });
@@ -16,7 +16,7 @@ export const googleAuth = async (req, res) => {
 
     console.log("📦 Firebase Token Received");
 
-    // 🔐 Verify Firebase token
+    /// 🔐 Verify Firebase token
     let decoded;
     try {
       decoded = await verifyFirebaseToken(token);
@@ -29,14 +29,21 @@ export const googleAuth = async (req, res) => {
       });
     }
 
-    // 🔍 Find existing user
+    /// 🔍 Find existing user
     let user = await User.findOne({ googleId: decoded.uid });
 
     if (user) {
       console.log("👤 Existing user found");
+
+      /// 🔥 FIX: ensure name exists for old users
+      if (!user.name || user.name.trim() === "") {
+        user.name = "Narada Link User";
+        await user.save();
+        console.log("🛠️ Default name applied to existing user");
+      }
     }
 
-    // 🆕 Create new user if not exists
+    /// 🆕 Create new user if not exists
     if (!user) {
       console.log("🆕 Creating new user");
 
@@ -44,10 +51,13 @@ export const googleAuth = async (req, res) => {
         googleId: decoded.uid,
         email: decoded.email,
         avatar: decoded.picture,
+
+        /// 🔥 IMPORTANT DEFAULT
+        name: "Narada Link User",
       });
     }
 
-    // 🔑 Generate JWT
+    /// 🔑 Generate JWT
     const jwtToken = generateToken(user);
 
     console.log("🔐 JWT Generated");

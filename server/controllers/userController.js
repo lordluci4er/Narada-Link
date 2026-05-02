@@ -80,7 +80,7 @@ export const setName = async (req, res) => {
 };
 
 
-/// 🔥 UPDATE PROFILE (NEW - FULL CONTROL)
+/// 🔥 UPDATE PROFILE
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -88,7 +88,6 @@ export const updateProfile = async (req, res) => {
 
     const updateData = {};
 
-    /// 🔥 optional updates only
     if (name && name.trim().length >= 2) {
       updateData.name = name.trim();
     }
@@ -112,7 +111,7 @@ export const updateProfile = async (req, res) => {
 };
 
 
-/// 🔍 SEARCH USERS (SECURE)
+/// 🔍 SEARCH USERS (🔥 DEFAULT NAME FIX)
 export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
@@ -126,12 +125,18 @@ export const searchUsers = async (req, res) => {
 
     const users = await User.find({
       username: { $regex: clean, $options: "i" },
-      _id: { $ne: userId }, // 🔥 remove self
+      _id: { $ne: userId },
     })
       .select("username name avatar")
       .limit(20);
 
-    res.json(users);
+    /// 🔥 DEFAULT NAME FIX
+    const safeUsers = users.map((u) => ({
+      ...u._doc,
+      name: u.name || "Narada Link User",
+    }));
+
+    res.json(safeUsers);
 
   } catch (err) {
     console.error("Search Error:", err);
@@ -140,7 +145,7 @@ export const searchUsers = async (req, res) => {
 };
 
 
-/// 👤 GET CURRENT USER
+/// 👤 GET CURRENT USER (🔥 SAFE RETURN)
 export const getMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -151,7 +156,10 @@ export const getMe = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    res.json(user);
+    res.json({
+      ...user._doc,
+      name: user.name || "Narada Link User",
+    });
 
   } catch (error) {
     console.log("❌ getMe error:", error.message);

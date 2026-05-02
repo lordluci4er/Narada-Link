@@ -23,13 +23,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final socket = SocketService();
 
-  List chats = []; // 🔥 dynamic list
+  List chats = [];
 
   @override
   void initState() {
     super.initState();
 
-    loadChats(); // initial load
+    loadChats();
 
     socket.connect(userId: widget.myId);
 
@@ -56,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// 🔥 REALTIME CHAT UPDATE (GAME CHANGER)
+  /// 🔥 REALTIME CHAT UPDATE
   void updateChatList(dynamic msg) {
     final senderId = msg['senderId'];
     final receiverId = msg['receiverId'];
@@ -70,22 +70,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (index != -1) {
-      // 🔥 update existing chat
       chats[index]['lastMessage'] = text;
       chats[index]['createdAt'] =
           DateTime.now().toIso8601String();
+      chats[index]['senderId'] = senderId;
     } else {
-      // 🔥 new chat add
+      /// 🔥 NEW CHAT DEFAULT
       chats.insert(0, {
         'userId': otherUserId,
-        'username': "New User",
+        'name': "Narada Link User", // ✅ FIXED DEFAULT
         'lastMessage': text,
         'createdAt': DateTime.now().toIso8601String(),
         'senderId': senderId,
       });
     }
 
-    // 🔥 move latest chat on top
     chats.sort((a, b) =>
         DateTime.parse(b['createdAt'])
             .compareTo(DateTime.parse(a['createdAt'])));
@@ -190,8 +189,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final chat = chats[index];
 
         final userId = chat['userId'];
-        final username =
-            (chat['username'] ?? "Unknown").toString();
+
+        /// 🔥 FINAL FIX (USE NAME)
+        final name =
+            (chat['name'] ?? "Narada Link User").toString();
+
         final avatar = chat['avatar'];
         final lastMessageRaw =
             (chat['lastMessage'] ?? "").toString();
@@ -236,8 +238,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       avatar != null ? NetworkImage(avatar) : null,
                   child: avatar == null
                       ? Text(
-                          username.isNotEmpty
-                              ? username[0].toUpperCase()
+                          name.isNotEmpty
+                              ? name[0].toUpperCase()
                               : "U",
                           style: const TextStyle(
                               color: AppColors.primary),
@@ -254,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         CrossAxisAlignment.start,
                     children: [
                       Text(
-                        username,
+                        name, // ✅ FIXED
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.bold,

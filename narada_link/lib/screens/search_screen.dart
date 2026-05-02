@@ -90,10 +90,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     itemBuilder: (context, index) {
                       final user = users[index];
 
+                      /// 🔥 SAFE DATA (FINAL FIX)
                       final name =
-                          (user['name'] ?? "Unknown").toString();
+                          (user['name'] ?? "Narada Link User").toString();
+
                       final username =
                           (user['username'] ?? "").toString();
+
                       final avatar = user['avatar'];
 
                       return ListTile(
@@ -120,7 +123,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               : null,
                         ),
 
-                        /// 🔥 NAME + USERNAME UI
+                        /// 🔥 NAME + USERNAME
                         title: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -131,13 +134,14 @@ class _SearchScreenState extends State<SearchScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
-                              "@$username",
-                              style: const TextStyle(
-                                color: AppColors.secondary,
-                                fontSize: 12,
+                            if (username.isNotEmpty)
+                              Text(
+                                "@$username",
+                                style: const TextStyle(
+                                  color: AppColors.secondary,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
                           ],
                         ),
 
