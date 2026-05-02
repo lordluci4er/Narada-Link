@@ -25,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List chats = [];
   bool loading = true;
 
+  DateTime lastFetch = DateTime.now(); // 🔥 throttle
+
   @override
   void initState() {
     super.initState();
@@ -32,9 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME REFRESH
+    /// 🔥 REALTIME (THROTTLED)
     socket.onMessage((_) {
-      loadChats();
+      final now = DateTime.now();
+
+      if (now.difference(lastFetch).inSeconds > 2) {
+        lastFetch = now;
+        loadChats();
+      }
     });
   }
 
@@ -44,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// 🔥 LOAD CONVERSATIONS (NEW API)
+  /// 🔥 LOAD CONVERSATIONS
   void loadChats() async {
     final data = await ApiService.getConversations(widget.jwt);
 
@@ -54,6 +61,12 @@ class _HomeScreenState extends State<HomeScreen> {
       chats = data;
       loading = false;
     });
+  }
+
+  /// 🔥 TIME FORMATTER
+  String formatTime(String date) {
+    final dt = DateTime.parse(date).toLocal();
+    return "${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
   }
 
   @override
@@ -212,15 +225,19 @@ class _HomeScreenState extends State<HomeScreen> {
         final chat = chats[index];
 
         final userId = chat['userId'];
-        final username = chat['username'] ?? "User";
+        final username = (chat['username'] ?? "Unknown").toString();
         final avatar = chat['avatar'];
-        final lastMessageRaw = chat['lastMessage'] ?? "";
+        final lastMessageRaw = (chat['lastMessage'] ?? "").toString();
 
         final isMe =
             chat['senderId'].toString() == widget.myId.toString();
 
         final lastMessage =
             isMe ? "You: $lastMessageRaw" : lastMessageRaw;
+
+        final time = chat['createdAt'] != null
+            ? formatTime(chat['createdAt'])
+            : "";
 
         return GestureDetector(
           onTap: () {
@@ -243,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Row(
               children: [
+                /// 🔥 AVATAR
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: AppColors.input,
@@ -250,7 +268,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       avatar != null ? NetworkImage(avatar) : null,
                   child: avatar == null
                       ? Text(
-                          username[0].toUpperCase(),
+                          username.isNotEmpty
+                              ? username[0].toUpperCase()
+                              : "U",
                           style: const TextStyle(color: AppColors.primary),
                         )
                       : null,
@@ -258,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(width: 12),
 
+                /// 🔥 TEXT CONTENT
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,13 +293,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 4),
                       Text(
                         lastMessage,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.secondary,
                           fontSize: 12,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                  ),
+                ),
+
+                /// 🔥 TIME
+                Text(
+                  time,
+                  style: const TextStyle(
+                    color: AppColors.secondary,
+                    fontSize: 11,
                   ),
                 ),
               ],

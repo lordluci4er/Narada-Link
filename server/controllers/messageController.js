@@ -21,6 +21,7 @@ export const sendMessage = async (req, res) => {
       text,
     });
 
+    /// 🔔 PUSH NOTIFICATION
     const receiver = await User.findById(receiverIdStr);
 
     if (receiver?.fcmToken) {
@@ -37,13 +38,15 @@ export const sendMessage = async (req, res) => {
             type: "chat",
           },
         });
-      } catch (err) {}
+      } catch (_) {}
     }
 
     res.status(201).json({
       ...message.toObject(),
       senderId,
       receiverId: receiverIdStr,
+      text: message.text || "",
+      createdAt: message.createdAt,
     });
 
   } catch (error) {
@@ -65,7 +68,16 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    res.json(messages);
+    /// 🔥 SAFE FORMAT
+    const formatted = messages.map((m) => ({
+      ...m.toObject(),
+      senderId: m.senderId.toString(),
+      receiverId: m.receiverId.toString(),
+      text: m.text || "",
+      createdAt: m.createdAt,
+    }));
+
+    res.json(formatted);
 
   } catch (error) {
     res.status(500).json({ msg: "Server error" });
@@ -73,7 +85,7 @@ export const getMessages = async (req, res) => {
 };
 
 
-/// 🔥 GET RECENT CHATS (WORKING)
+/// 🔥 GET RECENT CHATS
 export const getRecentChats = async (req, res) => {
   try {
     const userId = (req.user?.id || req.user).toString();
@@ -87,6 +99,7 @@ export const getRecentChats = async (req, res) => {
           ],
         },
       },
+
       { $sort: { createdAt: -1 } },
 
       {
@@ -110,6 +123,12 @@ export const getRecentChats = async (req, res) => {
         },
       },
 
+      {
+        $addFields: {
+          lastMessage: { $ifNull: ["$lastMessage", ""] },
+        },
+      },
+
       { $sort: { createdAt: -1 } },
     ]);
 
@@ -121,7 +140,7 @@ export const getRecentChats = async (req, res) => {
 };
 
 
-/// 🔥 GET CONVERSATIONS (🔥 FINAL FIXED VERSION)
+/// 🔥 GET CONVERSATIONS (FINAL CLEAN VERSION)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -159,14 +178,15 @@ export const getConversations = async (req, res) => {
         },
       },
 
-      /// 🔥 FIX: convert string → ObjectId
+      /// 🔥 convert string → ObjectId
       {
         $addFields: {
           userObjectId: { $toObjectId: "$_id" },
+          lastMessage: { $ifNull: ["$lastMessage", ""] },
         },
       },
 
-      /// 🔥 JOIN USERS (NOW WORKS)
+      /// 🔥 JOIN USER
       {
         $lookup: {
           from: "users",
@@ -176,13 +196,20 @@ export const getConversations = async (req, res) => {
         },
       },
 
-      { $unwind: "$user" },
+      /// 🔥 SAFE UNWIND
+      {
+        $unwind: {
+          path: "$user",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
 
+      /// 🔥 FINAL RESPONSE SHAPE (GUARANTEED FIELDS)
       {
         $project: {
           userId: "$_id",
-          username: "$user.username",
-          avatar: "$user.avatar",
+          username: { $ifNull: ["$user.username", "Unknown"] },
+          avatar: { $ifNull: ["$user.avatar", null] },
           lastMessage: 1,
           senderId: 1,
           createdAt: 1,
