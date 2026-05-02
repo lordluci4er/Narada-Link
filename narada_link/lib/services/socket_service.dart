@@ -12,6 +12,7 @@ class SocketService {
     required String userId,
     String? token,
   }) {
+    /// ❌ prevent duplicate connection
     if (socket != null && socket!.connected) return;
 
     socket = IO.io(
@@ -35,12 +36,14 @@ class SocketService {
       isConnected = true;
       print("🟢 Socket Connected");
 
-      /// fallback join
+      /// 🔥 JOIN ROOM (important)
       socket!.emit("join", userId.toString());
     });
 
     socket!.onReconnect((_) {
       print("🔁 Reconnected");
+
+      /// 🔥 REJOIN
       socket!.emit("join", userId.toString());
     });
 
@@ -68,41 +71,46 @@ class SocketService {
     socket!.emit("send_message", data);
   }
 
+  /// 👀 SEND SEEN (🔥 MOST IMPORTANT)
+  void sendSeen({
+    required String senderId,
+  }) {
+    if (!(socket?.connected ?? false)) return;
+
+    socket!.emit("messageSeen", {
+      "userId": senderId,
+    });
+  }
+
+  /// 📦 SEND DELIVERED (OPTIONAL BUT GOOD)
+  void sendDelivered() {
+    if (!(socket?.connected ?? false)) return;
+
+    socket!.emit("messageDelivered");
+  }
+
   /// 📩 NEW MESSAGE
   void onNewMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
-    socket!.off("newMessage");
-
+    socket!.off("newMessage"); // prevent duplicate
     socket!.on("newMessage", (data) {
       callback(data);
     });
   }
 
-  /// 🔄 AUTO REFRESH
-  void onNewMessageRefresh(Function() callback) {
-    if (socket == null) return;
-
-    socket!.on("newMessage", (_) {
-      callback();
-    });
-  }
-
-  /// 👀 ✅ MESSAGE SEEN (🔥 FINAL FIX)
-  void onMessageSeen(Function(String messageId) callback) {
+  /// 👀 MESSAGE SEEN (PER MESSAGE)
+  void onMessageSeen(Function(dynamic data) callback) {
     if (socket == null) return;
 
     socket!.off("messageSeen");
 
     socket!.on("messageSeen", (data) {
-      final messageId = data['messageId']?.toString();
-      if (messageId != null) {
-        callback(messageId);
-      }
+      callback(data); // includes messageId + seenAt
     });
   }
 
-  /// 🔵 OPTIONAL BULK SEEN (future use)
+  /// 🔵 BULK SEEN (FUTURE USE)
   void onMessagesSeen(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -158,7 +166,7 @@ class SocketService {
     });
   }
 
-  /// 🔌 DISCONNECT
+  /// 🔌 DISCONNECT (CLEAN)
   void disconnect() {
     if (socket == null) return;
 

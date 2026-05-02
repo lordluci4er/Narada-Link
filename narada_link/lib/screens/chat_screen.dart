@@ -40,14 +40,17 @@ class _ChatScreenState extends State<ChatScreen> {
     loadMessages();
     loadUserStatus();
 
+    /// 🔥 DELIVERED (API ok)
     ApiService.markDelivered(widget.jwt);
-    ApiService.markAsSeen(widget.userId, widget.jwt);
 
-    /// 🔥 CONNECT
+    /// 🔥 CONNECT SOCKET
     socket.connect(userId: widget.myId);
 
-    /// 🔥 JOIN ROOM (SAFE)
+    /// 🔥 JOIN ROOM
     socket.socket?.emit("join", widget.myId);
+
+    /// 🔥 CHAT OPEN → SEND SEEN
+    socket.sendSeen(senderId: widget.userId);
 
     /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
@@ -69,7 +72,9 @@ class _ChatScreenState extends State<ChatScreen> {
         });
 
         scrollToBottom();
-        ApiService.markAsSeen(widget.userId, widget.jwt);
+
+        /// 🔥 SOCKET SEEN (NO API ❌)
+        socket.sendSeen(senderId: widget.userId);
       }
     });
 
@@ -83,16 +88,17 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    /// 🔥 ✅ SEEN (FIXED USING SERVICE)
-    socket.onMessageSeen((messageId) {
+    /// 🔥 ✅ SEEN (REALTIME FROM SERVER)
+    socket.socket?.on("messageSeen", (data) {
       final index =
-          messages.indexWhere((m) => m['_id'] == messageId);
+          messages.indexWhere((m) => m['_id'] == data['messageId']);
 
       if (index != -1 && mounted) {
         setState(() {
           messages[index]['status'] = "seen";
-          messages[index]['seenAt'] =
-              DateTime.now().toIso8601String();
+
+          /// ✅ SERVER TIME USE
+          messages[index]['seenAt'] = data['seenAt'];
         });
       }
     });
@@ -260,7 +266,6 @@ class _ChatScreenState extends State<ChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            /// 🔥 MESSAGES
             Expanded(
               child: loading
                   ? const Center(child: CircularProgressIndicator())
@@ -268,8 +273,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? const Center(
                           child: Text(
                             "Start conversation 👋",
-                            style: TextStyle(
-                                color: AppColors.secondary),
+                            style:
+                                TextStyle(color: AppColors.secondary),
                           ),
                         )
                       : ListView.builder(
@@ -298,6 +303,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   seenAt: m['seenAt'],
                                 ),
 
+                                /// 🔥 ONLY LAST SEEN TEXT
                                 if (isMe &&
                                     isLastMessage &&
                                     m['status'] == "seen" &&

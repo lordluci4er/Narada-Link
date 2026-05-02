@@ -34,14 +34,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME MESSAGE
+    /// 🔥 JOIN (IMPORTANT)
+    socket.socket?.emit("join", widget.myId);
+
+    /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
       updateChatList(data);
     });
 
-    /// 🔥 SAFE SYNC
-    socket.onNewMessageRefresh(() {
-      loadChats();
+    /// 🔥 ✅ BULK SEEN (NEW SYSTEM)
+    socket.onMessagesSeen((data) {
+      final ids = data['messageIds'] ?? [];
+
+      for (var chat in chats) {
+        if (chat['userId'] == data['by']) {
+          chat['unreadCount'] = 0;
+        }
+      }
+
+      if (mounted) setState(() {});
     });
 
     /// 🔥 PROFILE UPDATE
@@ -157,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 🔥 ONLINE TEXT
+  /// 🔥 STATUS TEXT
   String getStatusText(chat) {
     if (chat['isOnline'] == true) return "🟢 Online";
 
@@ -298,7 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Row(
               children: [
-                /// 👤 AVATAR + STATUS DOT
                 Stack(
                   children: [
                     CircleAvatar(
@@ -321,8 +331,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             )
                           : null,
                     ),
-
-                    /// 🔥 ALWAYS SHOW DOT (green/grey)
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -342,10 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(width: 12),
 
-                /// TEXT
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
@@ -360,9 +366,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               : FontWeight.normal,
                         ),
                       ),
-
                       const SizedBox(height: 2),
-
                       Text(
                         getStatusText(chat),
                         style: const TextStyle(
@@ -370,9 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.grey,
                         ),
                       ),
-
                       const SizedBox(height: 4),
-
                       Row(
                         children: [
                           Expanded(
@@ -388,7 +390,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-
                           if (unread > 0)
                             Container(
                               margin:
@@ -414,7 +415,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                /// TIME
                 Text(
                   time,
                   style: const TextStyle(

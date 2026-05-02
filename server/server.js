@@ -20,7 +20,7 @@ const server = http.createServer(app);
 /// 🔥 SOCKET.IO
 const io = new Server(server, {
   cors: {
-    origin: "*", // ⚠️ production me restrict karo
+    origin: "*", // ⚠️ restrict in production
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   },
@@ -32,18 +32,20 @@ const io = new Server(server, {
 /// 🔥 GLOBAL IO
 app.set("io", io);
 
-/// 🔥 OPTIONAL CUSTOM SOCKET FILE
+/// 🔥 OPTIONAL SOCKET FILE
 initSocket(io);
 
 
+/// ===============================
 /// 🔥 MAIN CONNECTION
+/// ===============================
 io.on("connection", async (socket) => {
   console.log("🟢 Connected:", socket.id);
 
   let userId = socket.handshake.query.userId;
 
   /// =========================
-  /// 🟢 HANDLE USER JOIN
+  /// 🟢 HANDLE JOIN
   /// =========================
   const handleJoin = async (uid) => {
     if (!uid) return;
@@ -53,20 +55,51 @@ io.on("connection", async (socket) => {
 
     socket.join(userId);
 
+    const now = new Date();
+
     /// 🟢 UPDATE ONLINE
     await User.findByIdAndUpdate(userId, {
       isOnline: true,
-      lastSeen: new Date(),
+      lastSeen: now,
     });
 
     console.log(`👤 User ${userId} joined`);
 
-    /// 🔥 BROADCAST STATUS
+    /// 🔥 BROADCAST ONLINE
     io.emit("userStatus", {
       userId,
       isOnline: true,
-      lastSeen: new Date(),
+      lastSeen: now,
     });
+
+    /// =========================
+    /// 🔥 AUTO DELIVERED (JOIN FIX)
+    /// =========================
+    const undelivered = await Message.find({
+      receiverId: userId,
+      status: "sent",
+    });
+
+    if (undelivered.length > 0) {
+      const deliveredAt = new Date();
+      const ids = undelivered.map((m) => m._id);
+
+      await Message.updateMany(
+        { _id: { $in: ids } },
+        {
+          $set: {
+            status: "delivered",
+            deliveredAt,
+          },
+        }
+      );
+
+      undelivered.forEach((msg) => {
+        io.to(msg.senderId.toString()).emit("messageDelivered", {
+          messageId: msg._id,
+        });
+      });
+    }
   };
 
   /// 🔥 AUTO JOIN (HANDSHAKE)
@@ -74,13 +107,13 @@ io.on("connection", async (socket) => {
     await handleJoin(userId);
   }
 
-  /// 🔥 MANUAL JOIN (FALLBACK)
+  /// 🔥 MANUAL JOIN (SAFE)
   socket.on("join", async (uid) => {
     await handleJoin(uid);
   });
 
   /// =========================
-  /// 👀 MESSAGE SEEN
+  /// 👀 MESSAGE SEEN (FINAL)
   /// =========================
   socket.on("messageSeen", async ({ userId: senderId }) => {
     try {
@@ -94,6 +127,7 @@ io.on("connection", async (socket) => {
 
       if (messages.length === 0) return;
 
+      const seenAt = new Date();
       const ids = messages.map((m) => m._id);
 
       await Message.updateMany(
@@ -102,16 +136,15 @@ io.on("connection", async (socket) => {
           $set: {
             status: "seen",
             seen: true,
-            seenAt: new Date(),
+            seenAt,
           },
         }
       );
 
-      /// 🔥 EMIT ONLY UPDATED IDS
-      ids.forEach((id) => {
-        io.to(senderId).emit("messageSeen", {
-          messageId: id,
-        });
+      /// 🔥 BULK EMIT (UPDATED)
+      io.to(senderId).emit("messagesSeen", {
+        messageIds: ids,
+        seenAt,
       });
 
     } catch (err) {
@@ -120,7 +153,7 @@ io.on("connection", async (socket) => {
   });
 
   /// =========================
-  /// 📦 MESSAGE DELIVERED
+  /// 📦 MESSAGE DELIVERED (MANUAL TRIGGER)
   /// =========================
   socket.on("messageDelivered", async () => {
     try {
@@ -133,6 +166,7 @@ io.on("connection", async (socket) => {
 
       if (messages.length === 0) return;
 
+      const deliveredAt = new Date();
       const ids = messages.map((m) => m._id);
 
       await Message.updateMany(
@@ -140,14 +174,13 @@ io.on("connection", async (socket) => {
         {
           $set: {
             status: "delivered",
-            deliveredAt: new Date(),
+            deliveredAt,
           },
         }
       );
 
-      /// 🔥 EMIT
       messages.forEach((msg) => {
-        io.to(msg.senderId).emit("messageDelivered", {
+        io.to(msg.senderId.toString()).emit("messageDelivered", {
           messageId: msg._id,
         });
       });
@@ -165,16 +198,18 @@ io.on("connection", async (socket) => {
 
     if (!socket.userId) return;
 
+    const now = new Date();
+
     await User.findByIdAndUpdate(socket.userId, {
       isOnline: false,
-      lastSeen: new Date(),
+      lastSeen: now,
     });
 
     /// 🔥 BROADCAST OFFLINE
     io.emit("userStatus", {
       userId: socket.userId,
       isOnline: false,
-      lastSeen: new Date(),
+      lastSeen: now,
     });
   });
 
