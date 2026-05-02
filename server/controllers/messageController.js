@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import admin from "../config/firebaseAdmin.js";
 
-/// 🔥 SEND MESSAGE
+/// 🔥 SEND MESSAGE (HYBRID)
 export const sendMessage = async (req, res) => {
   try {
     const senderId = (req.user?.id || req.user).toString();
@@ -29,7 +29,6 @@ export const sendMessage = async (req, res) => {
       replyTo: replyTo || null,
       replyText: replyText || null,
       replySenderId: replySenderId || null,
-      seen: false,
       status: "sent",
     });
 
@@ -68,7 +67,6 @@ export const sendMessage = async (req, res) => {
     }
 
     res.status(201).json(message);
-
   } catch (error) {
     console.error("Send Message Error:", error);
     res.status(500).json({ msg: "Server error" });
@@ -76,7 +74,7 @@ export const sendMessage = async (req, res) => {
 };
 
 
-/// 🔥 GET MESSAGES
+/// 🔥 GET MESSAGES (HYBRID)
 export const getMessages = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -90,7 +88,7 @@ export const getMessages = async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    /// 🔥 AUTO SEEN
+    /// 🔥 AUTO SEEN (bulk)
     const unseenIds = messages
       .filter(
         (m) =>
@@ -120,8 +118,21 @@ export const getMessages = async (req, res) => {
       });
     }
 
-    res.json(messages);
+    /// 🔥 FORMAT (OLD + NEW MIX)
+    const formatted = messages.map((m) => ({
+      ...m.toObject(),
+      senderId: m.senderId.toString(),
+      receiverId: m.receiverId.toString(),
+      text: m.text || "",
+      status: m.status || "sent",
+      deliveredAt: m.deliveredAt || null,
+      seenAt: m.seenAt || null,
+      replyTo: m.replyTo || null,
+      replyText: m.replyText || null,
+      replySenderId: m.replySenderId || null,
+    }));
 
+    res.json(formatted);
   } catch (error) {
     console.error("Get Messages Error:", error);
     res.status(500).json({ msg: "Server error" });
@@ -165,7 +176,6 @@ export const markAsDelivered = async (req, res) => {
     });
 
     res.json({ msg: "Delivered updated" });
-
   } catch (err) {
     console.error("Delivered Error:", err);
     res.status(500).json({ msg: "Error updating delivered" });
@@ -173,7 +183,52 @@ export const markAsDelivered = async (req, res) => {
 };
 
 
-/// 🔥 GET CONVERSATIONS
+/// 🔥 MARK AS SEEN (KEEP FOR BACKUP API)
+export const markAsSeen = async (req, res) => {
+  try {
+    const myId = (req.user?.id || req.user).toString();
+    const userId = req.params.userId.toString();
+
+    const messages = await Message.find({
+      senderId: userId,
+      receiverId: myId,
+      status: { $ne: "seen" },
+    });
+
+    if (!messages.length) {
+      return res.json({ msg: "Nothing to update" });
+    }
+
+    const ids = messages.map((m) => m._id);
+    const io = req.app.get("io");
+
+    const now = new Date();
+
+    await Message.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          status: "seen",
+          seen: true,
+          seenAt: now,
+        },
+      }
+    );
+
+    io.to(userId).emit("messagesSeen", {
+      messageIds: ids,
+      seenAt: now,
+    });
+
+    res.json({ msg: "Seen updated" });
+  } catch (err) {
+    console.error("Seen Error:", err);
+    res.status(500).json({ msg: "Error updating seen" });
+  }
+};
+
+
+/// 🔥 GET CONVERSATIONS (WITH UNREAD COUNT)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -188,6 +243,7 @@ export const getConversations = async (req, res) => {
         },
       },
       { $sort: { createdAt: -1 } },
+
       {
         $group: {
           _id: {
@@ -199,13 +255,25 @@ export const getConversations = async (req, res) => {
           },
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
+          unreadCount: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$receiverId", myId] },
+                    { $ne: ["$status", "seen"] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
         },
       },
-      { $sort: { createdAt: -1 } },
     ]);
 
     res.json(conversations);
-
   } catch (err) {
     console.error("Conversations Error:", err);
     res.status(500).json({ msg: "Server error" });
@@ -213,7 +281,7 @@ export const getConversations = async (req, res) => {
 };
 
 
-/// 🔥 ✅ FIXED: GET RECENT CHATS (MISSING FUNCTION)
+/// 🔥 GET RECENT CHATS
 export const getRecentChats = async (req, res) => {
   try {
     const userId = (req.user?.id || req.user).toString();
@@ -247,7 +315,6 @@ export const getRecentChats = async (req, res) => {
     ]);
 
     res.json(chats);
-
   } catch (err) {
     console.error("Recent Chats Error:", err);
     res.status(500).json({ msg: "Server error" });
