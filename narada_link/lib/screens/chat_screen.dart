@@ -46,27 +46,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 NEW MESSAGE
+    /// 🔥 NEW MESSAGE (REALTIME)
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
       if (senderId == widget.myId) return;
 
       if (senderId == widget.userId && mounted) {
-        final msg = {
-          "_id": data['messageId'],
-          "senderId": senderId,
-          "receiverId": widget.myId,
-          "text": data['text'],
-          "createdAt": data['createdAt'] ??
-              DateTime.now().toIso8601String(),
-          "status": data['status'] ?? "sent",
-          "seenAt": null,
-        };
+        setState(() {
+          messages.add({
+            "_id": data['messageId'],
+            "senderId": senderId,
+            "receiverId": widget.myId,
+            "text": data['text'],
+            "createdAt": data['createdAt'],
+            "status": data['status'] ?? "sent",
+            "seenAt": null,
+          });
+        });
 
-        setState(() => messages.add(msg));
         scrollToBottom();
-
         ApiService.markAsSeen(widget.userId, widget.jwt);
       }
     });
@@ -128,7 +127,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🟢 USER STATUS (API fallback)
+  /// 🟢 LOAD STATUS
   void loadUserStatus() async {
     final data =
         await ApiService.getUserStatus(widget.userId, widget.jwt);
@@ -141,20 +140,20 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🔽 SCROLL
+  /// 🔥 SCROLL (REVERSE LIST FIX)
   void scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (scrollController.hasClients) {
         scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
+          0, // 🔥 reverse list → bottom
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  /// ✉️ SEND
+  /// ✉️ SEND MESSAGE
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
@@ -188,18 +187,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    socket.socket?.off("newMessage");
-    socket.socket?.off("messageDelivered");
-    socket.socket?.off("messageSeen");
-    socket.socket?.off("userStatus");
-
     socket.disconnect();
     controller.dispose();
     scrollController.dispose();
     super.dispose();
   }
 
-  /// 🧠 SAFE TEXT
   String getText(Map<String, dynamic> m) {
     return m['text']?.toString() ?? "";
   }
@@ -239,14 +232,16 @@ class _ChatScreenState extends State<ChatScreen> {
     final displayName =
         (widget.name ?? "Narada Link User").toString();
 
+    final reversedMessages = messages.reversed.toList();
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: true,
 
-      /// 🔥 APPBAR (CLEAN UI)
+      /// 🔥 APPBAR
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -263,102 +258,113 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
 
       body: SafeArea(
-        child: Column(
-          children: [
-            if (loading)
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (messages.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: Text(
-                    "Start conversation 👋",
-                    style:
-                        TextStyle(color: AppColors.secondary),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            children: [
+              if (loading)
+                const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (messages.isEmpty)
+                const Expanded(
+                  child: Center(
+                    child: Text(
+                      "Start conversation 👋",
+                      style:
+                          TextStyle(color: AppColors.secondary),
+                    ),
                   ),
-                ),
-              )
-            else
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(10),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final m = messages[index];
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    reverse: true,
+                    padding:
+                        const EdgeInsets.fromLTRB(10, 10, 10, 80),
+                    itemCount: reversedMessages.length,
+                    itemBuilder: (context, index) {
+                      final m = reversedMessages[index];
 
-                    final isMe =
-                        m['senderId'].toString() == widget.myId;
+                      final isMe =
+                          m['senderId'].toString() == widget.myId;
 
-                    final isLastMessage =
-                        index == messages.length - 1;
+                      final isLastMessage = index == 0;
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        MessageBubble(
-                          text: getText(m),
-                          isMe: isMe,
-                          status: m['status'] ?? "sent",
-                          createdAt: m['createdAt'],
-                          seenAt: m['seenAt'],
-                        ),
+                      return Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.end,
+                        children: [
+                          MessageBubble(
+                            text: getText(m),
+                            isMe: isMe,
+                            status: m['status'] ?? "sent",
+                            createdAt: m['createdAt'],
+                            seenAt: m['seenAt'],
+                          ),
 
-                        /// 🔥 ONLY LAST MESSAGE SEEN TEXT
-                        if (isMe &&
-                            isLastMessage &&
-                            m['status'] == "seen" &&
-                            m['seenAt'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                                right: 16, bottom: 4),
-                            child: Text(
-                              getSeenText(m['seenAt']),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
+                          /// 🔥 ONLY LAST SEEN TEXT
+                          if (isMe &&
+                              isLastMessage &&
+                              m['status'] == "seen" &&
+                              m['seenAt'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  right: 16, bottom: 4),
+                              child: Text(
+                                getSeenText(m['seenAt']),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
 
-            /// INPUT
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: "Type a message...",
-                        hintStyle: TextStyle(
-                          color: AppColors.secondary,
+              /// 🔥 INPUT
+              Container(
+                padding: EdgeInsets.only(
+                  left: 10,
+                  right: 10,
+                  top: 8,
+                  bottom: MediaQuery.of(context).padding.bottom,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: "Type a message...",
+                          hintStyle: TextStyle(
+                            color: AppColors.secondary,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: send,
-                    icon: const Icon(
-                      Icons.send,
-                      color: AppColors.primary,
-                    ),
-                  )
-                ],
-              ),
-            )
-          ],
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: send,
+                      icon: const Icon(
+                        Icons.send,
+                        color: AppColors.primary,
+                      ),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
