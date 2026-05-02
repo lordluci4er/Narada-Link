@@ -7,17 +7,22 @@ class SocketService {
 
   bool isConnected = false;
 
-  /// 🔌 CONNECT SOCKET
+  /// 🔌 CONNECT SOCKET (🔥 FINAL FIXED)
   void connect({
     required String userId,
     String? token,
   }) {
+    /// ❌ prevent duplicate connection
     if (socket != null && socket!.connected) return;
 
     socket = IO.io(
       baseUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
+
+          /// 🔥 VERY IMPORTANT (ONLINE SYSTEM)
+          .setQuery({'userId': userId})
+
           .disableAutoConnect()
           .enableReconnection()
           .setReconnectionAttempts(10)
@@ -34,12 +39,13 @@ class SocketService {
       isConnected = true;
       print("🟢 Socket Connected");
 
-      /// 🔥 JOIN ROOM
+      /// 🔥 fallback join (safety)
       socket!.emit("join", userId.toString());
     });
 
     socket!.onReconnect((_) {
       print("🔁 Reconnected");
+
       socket!.emit("join", userId.toString());
     });
 
@@ -67,18 +73,7 @@ class SocketService {
     socket!.emit("send_message", data);
   }
 
-  /// 📥 OLD EVENT (optional)
-  void onMessage(Function(dynamic) callback) {
-    if (socket == null) return;
-
-    socket!.off("receive_message");
-
-    socket!.on("receive_message", (data) {
-      callback(data);
-    });
-  }
-
-  /// 🔥 NEW MESSAGE (MAIN EVENT)
+  /// 🔥 NEW MESSAGE
   void onNewMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -89,14 +84,13 @@ class SocketService {
     });
   }
 
-  /// 🔥 AUTO REFRESH (FIXED VERSION)
+  /// 🔥 AUTO REFRESH (SAFE VERSION)
   void onNewMessageRefresh(Function() callback) {
     if (socket == null) return;
 
-    socket!.off("newMessage"); // 🔥 correct cleanup
-
+    /// ⚠️ DO NOT off main listener
     socket!.on("newMessage", (_) {
-      callback(); // 👉 e.g. loadChats() or loadMessages()
+      callback();
     });
   }
 
@@ -123,13 +117,13 @@ class SocketService {
     });
   }
 
-  /// 🟢 ONLINE USERS
-  void onOnlineUsers(Function(dynamic) callback) {
+  /// 🟢 ONLINE STATUS (🔥 IMPORTANT)
+  void onUserStatus(Function(dynamic) callback) {
     if (socket == null) return;
 
-    socket!.off("online_users");
+    socket!.off("userStatus");
 
-    socket!.on("online_users", (data) {
+    socket!.on("userStatus", (data) {
       callback(data);
     });
   }
@@ -145,14 +139,13 @@ class SocketService {
     });
   }
 
-  /// 🔌 DISCONNECT (FULL CLEANUP)
+  /// 🔌 DISCONNECT
   void disconnect() {
     if (socket == null) return;
 
-    socket!.off("receive_message");
-    socket!.off("newMessage"); // 🔥 important
+    socket!.off("newMessage");
     socket!.off("typing");
-    socket!.off("online_users");
+    socket!.off("userStatus");
     socket!.off("userUpdated");
 
     socket!.disconnect();

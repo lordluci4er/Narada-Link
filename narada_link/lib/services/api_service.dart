@@ -175,6 +175,28 @@ class ApiService {
     } catch (_) {}
   }
 
+  /// 🟢 GET USER ONLINE STATUS (🔥 NEW)
+  static Future<Map<String, dynamic>?> getUserStatus(
+    String userId,
+    String jwt,
+  ) async {
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/api/users/status/$userId"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+        },
+      );
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 🔔 SAVE FCM TOKEN
   static Future<void> saveFcmToken(
     String fcmToken,
@@ -211,7 +233,7 @@ class ApiService {
     }
   }
 
-  /// 💬 GET CONVERSATIONS (WITH unreadCount)
+  /// 💬 GET CONVERSATIONS
   static Future<List> getConversations(String jwt) async {
     try {
       final res = await http.get(

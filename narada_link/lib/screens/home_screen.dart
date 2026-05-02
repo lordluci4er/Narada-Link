@@ -34,29 +34,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME MESSAGE (instant UI)
-    socket.onMessage((data) {
+    /// 🔥 REALTIME MESSAGE
+    socket.onNewMessage((data) {
       updateChatList(data);
     });
 
-    /// 🔥 AUTO REFRESH (server sync)
+    /// 🔥 SAFE SYNC
     socket.onNewMessageRefresh(() {
       loadChats();
     });
 
-    /// 🔥 NAME UPDATE
+    /// 🔥 PROFILE UPDATE
     socket.onUserUpdated((_) {
       loadChats();
+    });
+
+    /// 🔥 ONLINE STATUS
+    socket.onUserStatus((data) {
+      final userId = data['userId'];
+
+      final index = chats.indexWhere(
+        (c) => c['userId'].toString() == userId.toString(),
+      );
+
+      if (index != -1 && mounted) {
+        setState(() {
+          chats[index]['isOnline'] = data['isOnline'] ?? false;
+          chats[index]['lastSeen'] = data['lastSeen'];
+        });
+      }
     });
   }
 
   @override
   void dispose() {
-    socket.socket?.off("receive_message");
-    socket.socket?.off("newMessage");
-    socket.socket?.off("newMessage_refresh");
-    socket.socket?.off("userUpdated");
-
     socket.disconnect();
     super.dispose();
   }
@@ -94,13 +105,11 @@ class _HomeScreenState extends State<HomeScreen> {
           DateTime.now().toIso8601String();
       chats[index]['senderId'] = senderId;
 
-      /// 🔥 UNREAD COUNT
       if (senderId != widget.myId) {
         chats[index]['unreadCount'] =
             (chats[index]['unreadCount'] ?? 0) + 1;
       }
     } else {
-      /// 🔥 NEW CHAT
       chats.insert(0, {
         'userId': otherUserId,
         'name': "Narada Link User",
@@ -110,6 +119,8 @@ class _HomeScreenState extends State<HomeScreen> {
         'createdAt': DateTime.now().toIso8601String(),
         'senderId': senderId,
         'unreadCount': senderId == widget.myId ? 0 : 1,
+        'isOnline': false,
+        'lastSeen': null,
       });
     }
 
@@ -141,6 +152,28 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         return DateFormat('d MMM').format(dt);
       }
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /// 🔥 ONLINE TEXT
+  String getStatusText(chat) {
+    if (chat['isOnline'] == true) return "🟢 Online";
+
+    if (chat['lastSeen'] == null) return "";
+
+    try {
+      final diff = DateTime.now()
+          .difference(DateTime.parse(chat['lastSeen']));
+
+      if (diff.inMinutes < 1) return "👀 just now";
+      if (diff.inMinutes < 60)
+        return "👀 ${diff.inMinutes}m ago";
+      if (diff.inHours < 24)
+        return "💤 ${diff.inHours}h ago";
+
+      return "💤 ${diff.inDays}d ago";
     } catch (_) {
       return "";
     }
@@ -180,7 +213,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 10),
-
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -227,6 +259,8 @@ class _HomeScreenState extends State<HomeScreen> {
             (chat['name'] ?? "Narada Link User").toString();
 
         final avatar = chat['avatar'];
+        final unread = chat['unreadCount'] ?? 0;
+        final isOnline = chat['isOnline'] == true;
 
         final lastMessageRaw =
             (chat['lastMessage'] ?? "").toString();
@@ -239,11 +273,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final time = formatChatTime(chat['createdAt']);
 
-        final unread = chat['unreadCount'] ?? 0;
-
         return GestureDetector(
           onTap: () {
-            /// 🔥 RESET UNREAD
             chats[index]['unreadCount'] = 0;
 
             Navigator.push(
@@ -267,37 +298,59 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Row(
               children: [
-                /// 👤 AVATAR
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.input,
-                  backgroundImage:
-                      avatar != null &&
-                              avatar.toString().isNotEmpty
-                          ? NetworkImage(avatar)
+                /// 👤 AVATAR + STATUS DOT
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: AppColors.input,
+                      backgroundImage:
+                          avatar != null &&
+                                  avatar.toString().isNotEmpty
+                              ? NetworkImage(avatar)
+                              : null,
+                      child: (avatar == null ||
+                              avatar.toString().isEmpty)
+                          ? Text(
+                              name.isNotEmpty
+                                  ? name[0].toUpperCase()
+                                  : "U",
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                              ),
+                            )
                           : null,
-                  child: (avatar == null ||
-                          avatar.toString().isEmpty)
-                      ? Text(
-                          name.isNotEmpty
-                              ? name[0].toUpperCase()
-                              : "U",
-                          style: const TextStyle(
-                            color: AppColors.primary,
+                    ),
+
+                    /// 🔥 ALWAYS SHOW DOT (green/grey)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        height: 10,
+                        width: 10,
+                        decoration: BoxDecoration(
+                          color:
+                              isOnline ? Colors.green : Colors.grey,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.card,
+                            width: 2,
                           ),
-                        )
-                      : null,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(width: 12),
 
-                /// 💬 TEXT
+                /// TEXT
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
                         CrossAxisAlignment.start,
                     children: [
-                      /// NAME
                       Text(
                         name,
                         style: TextStyle(
@@ -308,9 +361,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
+                      const SizedBox(height: 2),
+
+                      Text(
+                        getStatusText(chat),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
+                      ),
+
                       const SizedBox(height: 4),
 
-                      /// MESSAGE + BADGE
                       Row(
                         children: [
                           Expanded(
@@ -352,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                /// ⏱ TIME
+                /// TIME
                 Text(
                   time,
                   style: const TextStyle(

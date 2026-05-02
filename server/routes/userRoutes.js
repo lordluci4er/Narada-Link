@@ -4,10 +4,11 @@ import protect from "../middleware/authMiddleware.js";
 import {
   setUsername,
   setName,
-  updateProfile, // 🔥 IMPORTANT ADD
+  updateProfile,
   searchUsers,
   getMe,
   saveFcmToken,
+  getUserStatus, // 🔥 NEW IMPORT
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -18,7 +19,7 @@ router.post("/set-username", protect, setUsername);
 /// 🔥 SET NAME
 router.post("/set-name", protect, setName);
 
-/// 🔥 UPDATE PROFILE (🔥 NEW MAIN API)
+/// 🔥 UPDATE PROFILE
 router.put("/update", protect, updateProfile);
 
 /// 🔍 SEARCH USERS
@@ -26,6 +27,9 @@ router.get("/search", protect, searchUsers);
 
 /// 👤 GET CURRENT USER
 router.get("/me", protect, getMe);
+
+/// 🟢 GET USER ONLINE STATUS (🔥 NEW)
+router.get("/status/:userId", protect, getUserStatus);
 
 /// 🔔 SAVE FCM TOKEN
 router.post("/fcm-token", protect, saveFcmToken);

@@ -5,20 +5,22 @@ import { Server } from "socket.io";
 import app from "./app.js";
 import connectDB from "./config/db.js";
 import initSocket from "./socket/socket.js";
+
 import Message from "./models/Message.js";
+import User from "./models/User.js";
 
 dotenv.config();
 
-/// 🔥 CONNECT DATABASE
+/// 🔥 DB CONNECT
 connectDB();
 
-/// 🔥 CREATE SERVER
+/// 🔥 HTTP SERVER
 const server = http.createServer(app);
 
-/// 🔥 SOCKET.IO SETUP
+/// 🔥 SOCKET.IO
 const io = new Server(server, {
   cors: {
-    origin: "*", // ⚠️ production me restrict karo
+    origin: "*", // ⚠️ restrict in production
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   },
@@ -30,31 +32,61 @@ const io = new Server(server, {
 /// 🔥 GLOBAL IO
 app.set("io", io);
 
-/// 🔥 INIT CUSTOM SOCKET FILE (if any)
+/// 🔥 OPTIONAL CUSTOM SOCKET FILE
 initSocket(io);
 
-
 /// 🔥 CONNECTION
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   console.log("🟢 Connected:", socket.id);
 
-  /// 🔥 JOIN ROOM + STORE USER ID
-  socket.on("join", (userId) => {
-    if (!userId) return;
+  /// 🔥 GET USER FROM HANDSHAKE
+  const userId = socket.handshake.query.userId;
 
-    socket.userId = userId.toString(); // ✅ FIX (VERY IMPORTANT)
+  if (userId) {
+    socket.userId = userId.toString();
+
+    /// 🟢 ONLINE UPDATE
+    await User.findByIdAndUpdate(userId, {
+      isOnline: true,
+      lastSeen: new Date(),
+    });
 
     socket.join(socket.userId);
 
-    console.log(`👤 User ${socket.userId} joined`);
+    console.log(`👤 User ${socket.userId} online`);
+
+    /// 🔥 BROADCAST ONLINE
+    io.emit("userStatus", {
+      userId: socket.userId,
+      isOnline: true,
+      lastSeen: new Date(),
+    });
+  }
+
+  /// 🔥 FALLBACK JOIN (if handshake not used)
+  socket.on("join", async (uid) => {
+    if (!uid) return;
+
+    socket.userId = uid.toString();
+    socket.join(socket.userId);
+
+    await User.findByIdAndUpdate(socket.userId, {
+      isOnline: true,
+      lastSeen: new Date(),
+    });
+
+    io.emit("userStatus", {
+      userId: socket.userId,
+      isOnline: true,
+      lastSeen: new Date(),
+    });
   });
 
-  /// 🔥 REALTIME SEEN (🔥 FINAL)
+  /// 🔥 MESSAGE SEEN (REALTIME)
   socket.on("messageSeen", async ({ userId }) => {
     try {
       if (!socket.userId || !userId) return;
 
-      /// 🔥 UPDATE DB
       const messages = await Message.find({
         senderId: userId,
         receiverId: socket.userId,
@@ -75,7 +107,7 @@ io.on("connection", (socket) => {
         }
       );
 
-      /// 🔥 EMIT BACK TO SENDER
+      /// 🔥 EMIT PER MESSAGE
       messages.forEach((msg) => {
         io.to(userId).emit("messageSeen", {
           messageId: msg._id,
@@ -83,11 +115,11 @@ io.on("connection", (socket) => {
       });
 
     } catch (err) {
-      console.log("❌ Seen Socket Error:", err.message);
+      console.log("❌ Seen Error:", err.message);
     }
   });
 
-  /// 🔥 REALTIME DELIVERED (OPTIONAL BUT 🔥 PRO)
+  /// 🔥 MESSAGE DELIVERED
   socket.on("messageDelivered", async () => {
     try {
       if (!socket.userId) return;
@@ -117,13 +149,27 @@ io.on("connection", (socket) => {
       });
 
     } catch (err) {
-      console.log("❌ Delivered Socket Error:", err.message);
+      console.log("❌ Delivered Error:", err.message);
     }
   });
 
   /// 🔴 DISCONNECT
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     console.log("🔴 Disconnected:", socket.id);
+
+    if (!socket.userId) return;
+
+    await User.findByIdAndUpdate(socket.userId, {
+      isOnline: false,
+      lastSeen: new Date(),
+    });
+
+    /// 🔥 BROADCAST OFFLINE
+    io.emit("userStatus", {
+      userId: socket.userId,
+      isOnline: false,
+      lastSeen: new Date(),
+    });
   });
 
   /// ❌ ERROR
@@ -131,7 +177,6 @@ io.on("connection", (socket) => {
     console.log("❌ Socket Error:", err);
   });
 });
-
 
 /// 🚀 START SERVER
 const PORT = process.env.PORT || 5000;

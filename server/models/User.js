@@ -2,37 +2,45 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
+    /// 🔐 GOOGLE AUTH
     googleId: {
       type: String,
       required: true,
       unique: true,
+      index: true,
     },
 
-    /// 🔥 FULL NAME (DEFAULT FIXED)
+    /// 👤 FULL NAME
     name: {
       type: String,
       trim: true,
-      default: "Narada Link User", // ✅ GLOBAL DEFAULT NAME
+      default: "Narada Link User",
+      maxlength: 50,
     },
 
+    /// 🆔 USERNAME
     username: {
       type: String,
       unique: true,
-      sparse: true, // ✅ allow multiple nulls
+      sparse: true, // allow multiple null
       trim: true,
       lowercase: true,
       minlength: 3,
       maxlength: 20,
+      index: true,
     },
 
+    /// 📧 EMAIL
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
       trim: true,
+      index: true,
     },
 
+    /// 🖼️ AVATAR
     avatar: {
       type: String,
       default: null,
@@ -44,19 +52,21 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    /// 🟢 ONLINE STATUS
+    /// 🟢 ONLINE STATUS (🔥 REALTIME)
     isOnline: {
       type: Boolean,
       default: false,
     },
 
-    /// ⏱ LAST SEEN
+    /// ⏱ LAST SEEN (🔥 IMPORTANT)
     lastSeen: {
       type: Date,
       default: null,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 export default mongoose.model("User", userSchema);

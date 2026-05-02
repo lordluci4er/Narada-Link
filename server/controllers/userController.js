@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import { validateUsername } from "../utils/validators.js";
 
-/// 🔥 SET USERNAME + NAME (FINAL SAFE)
+/// 🔥 SET USERNAME + NAME
 export const setUsername = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -18,7 +18,7 @@ export const setUsername = async (req, res) => {
       user.name = name.trim();
     }
 
-    /// 🔥 USERNAME UPDATE (SAFE)
+    /// 🔥 USERNAME UPDATE
     if (username) {
       const clean = username.toLowerCase().trim();
 
@@ -30,14 +30,12 @@ export const setUsername = async (req, res) => {
         return res.status(400).json({ msg: error });
       }
 
-      /// ❌ prevent overwrite
       if (user.username) {
         return res.status(400).json({
           msg: "Username already set",
         });
       }
 
-      /// 🔥 UNIQUE CHECK
       const exists = await User.findOne({ username: clean });
 
       if (exists) {
@@ -54,12 +52,12 @@ export const setUsername = async (req, res) => {
     /// 🔥 SOCKET EMIT
     const io = req.app.get("io");
 
-    io.to(userId.toString()).emit("userUpdated", {
-      userId,
+    io.emit("userUpdated", {
+      userId: user._id,
       name: user.name,
+      avatar: user.avatar,
     });
 
-    /// 🔥 RESPONSE (IMPORTANT)
     res.json({
       msg: "Updated",
       user: {
@@ -91,11 +89,14 @@ export const setName = async (req, res) => {
       { new: true }
     );
 
-    /// 🔥 SOCKET EMIT
+    if (!updatedUser) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
     const io = req.app.get("io");
 
-    io.to(userId.toString()).emit("userUpdated", {
-      userId,
+    io.emit("userUpdated", {
+      userId: updatedUser._id,
       name: updatedUser.name,
     });
 
@@ -133,12 +134,16 @@ export const updateProfile = async (req, res) => {
       { new: true }
     );
 
-    /// 🔥 SOCKET EMIT
+    if (!updatedUser) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
     const io = req.app.get("io");
 
-    io.to(userId.toString()).emit("userUpdated", {
-      userId,
+    io.emit("userUpdated", {
+      userId: updatedUser._id,
       name: updatedUser.name,
+      avatar: updatedUser.avatar,
     });
 
     res.json({
@@ -153,7 +158,7 @@ export const updateProfile = async (req, res) => {
 };
 
 
-/// 🔍 SEARCH USERS (FIXED + CLEAN)
+/// 🔍 SEARCH USERS
 export const searchUsers = async (req, res) => {
   try {
     const query = (req.query.username || "").toLowerCase().trim();
@@ -168,7 +173,7 @@ export const searchUsers = async (req, res) => {
       username: { $regex: query, $options: "i" },
       _id: { $ne: userId },
     })
-      .select("name username avatar")
+      .select("name username avatar isOnline lastSeen")
       .limit(20);
 
     const result = users.map((u) => ({
@@ -179,6 +184,8 @@ export const searchUsers = async (req, res) => {
           : "Narada Link User",
       username: u.username || "",
       avatar: u.avatar || null,
+      isOnline: u.isOnline || false,
+      lastSeen: u.lastSeen || null,
     }));
 
     res.json(result);
@@ -232,5 +239,27 @@ export const saveFcmToken = async (req, res) => {
   } catch (err) {
     console.error("FCM Save Error:", err);
     res.status(500).json({ msg: "Error saving token" });
+  }
+};
+
+
+/// 🟢 GET USER STATUS (🔥 NEW)
+export const getUserStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .select("isOnline lastSeen");
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    res.json({
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
+    });
+
+  } catch (err) {
+    console.error("User Status Error:", err);
+    res.status(500).json({ msg: "Server error" });
   }
 };

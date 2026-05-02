@@ -30,11 +30,16 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Map<String, dynamic>> messages = [];
   bool loading = false;
 
+  /// 🟢 USER STATUS
+  bool isOnline = false;
+  String? lastSeen;
+
   @override
   void initState() {
     super.initState();
 
     loadMessages();
+    loadUserStatus();
 
     /// 🔥 STATUS UPDATE
     ApiService.markDelivered(widget.jwt);
@@ -42,7 +47,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 NEW MESSAGE
+    /// 🔥 REALTIME MESSAGE
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
@@ -97,9 +102,19 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     });
+
+    /// 🟢 ONLINE STATUS SOCKET
+    socket.socket?.on("userStatus", (data) {
+      if (data['userId'] == widget.userId && mounted) {
+        setState(() {
+          isOnline = data['isOnline'] ?? false;
+          lastSeen = data['lastSeen'];
+        });
+      }
+    });
   }
 
-  /// 🔥 LOAD
+  /// 🔥 LOAD MESSAGES
   void loadMessages() async {
     setState(() => loading = true);
 
@@ -117,11 +132,22 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       scrollToBottom();
-    } catch (e) {
-      print("🔥 Load messages error: $e");
-
+    } catch (_) {
       if (!mounted) return;
       setState(() => loading = false);
+    }
+  }
+
+  /// 🟢 LOAD USER STATUS (API fallback)
+  void loadUserStatus() async {
+    final data =
+        await ApiService.getUserStatus(widget.userId, widget.jwt);
+
+    if (data != null && mounted) {
+      setState(() {
+        isOnline = data['isOnline'] ?? false;
+        lastSeen = data['lastSeen'];
+      });
     }
   }
 
@@ -176,6 +202,7 @@ class _ChatScreenState extends State<ChatScreen> {
     socket.socket?.off("newMessage");
     socket.socket?.off("messageDelivered");
     socket.socket?.off("messageSeen");
+    socket.socket?.off("userStatus");
 
     socket.disconnect();
     controller.dispose();
@@ -185,17 +212,37 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String getText(Map<String, dynamic> m) {
     final val = m['text'];
-    if (val == null) return "";
-    return val.toString();
+    return val?.toString() ?? "";
   }
 
-  /// 🔥 SMART SEEN TEXT
+  /// 👀 SMART SEEN TEXT
   String getSeenText(String seenAt) {
-    final diff = DateTime.now().difference(DateTime.parse(seenAt));
+    final diff =
+        DateTime.now().difference(DateTime.parse(seenAt));
 
     if (diff.inSeconds < 30) return "👀 Seen just now";
-    if (diff.inMinutes < 5) return "👀 Active ${diff.inMinutes}m ago";
+    if (diff.inMinutes < 5)
+      return "👀 Active ${diff.inMinutes}m ago";
+
     return "💤 Seen earlier today";
+  }
+
+  /// 🟢 ONLINE STATUS FORMAT
+  String getStatus() {
+    if (isOnline) return "🟢 Online";
+
+    if (lastSeen == null) return "";
+
+    final diff =
+        DateTime.now().difference(DateTime.parse(lastSeen!));
+
+    if (diff.inMinutes < 1) return "Active just now";
+    if (diff.inMinutes < 5)
+      return "Active ${diff.inMinutes}m ago";
+    if (diff.inMinutes < 60)
+      return "Away ${diff.inMinutes}m ago";
+
+    return "Offline";
   }
 
   @override
@@ -203,7 +250,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final displayName =
         (widget.name ?? "Narada Link User").toString();
 
-    /// 🔥 LAST SEEN MESSAGE (ONLY MY LAST MSG)
+    /// 🔥 LAST SEEN MESSAGE
     final lastSeenMsg = messages.isNotEmpty
         ? messages.lastWhere(
             (m) =>
@@ -215,11 +262,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+
+      /// 🔥 APP BAR WITH STATUS
       appBar: AppBar(
-        title: Text(displayName),
         backgroundColor: AppColors.background,
         elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(displayName),
+            Text(
+              getStatus(),
+              style: TextStyle(
+                fontSize: 12,
+                color: isOnline ? Colors.green : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
+
       body: SafeArea(
         child: Column(
           children: [
@@ -261,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
 
-            /// 🔥 SINGLE SEEN TEXT (ONLY LAST MESSAGE)
+            /// 🔥 LAST SEEN TEXT
             if (lastSeenMsg.isNotEmpty &&
                 lastSeenMsg['seenAt'] != null)
               Padding(
