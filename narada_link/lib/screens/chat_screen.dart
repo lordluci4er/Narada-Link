@@ -34,9 +34,16 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
+    /// 🔥 LOAD FIRST
+    loadMessages();
+
+    /// 🔥 MARK AS SEEN (VERY IMPORTANT)
+    ApiService.markAsSeen(widget.userId, widget.jwt);
+
+    /// 🔥 CONNECT SOCKET
     socket.connect(userId: widget.myId);
 
-    /// 🔥 NEW MESSAGE LISTENER (UPDATED)
+    /// 🔥 REALTIME LISTENER
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
@@ -52,14 +59,16 @@ class _ChatScreenState extends State<ChatScreen> {
             "text": data['text'],
             "createdAt": data['createdAt'] ??
                 DateTime.now().toIso8601String(),
+            "seen": false,
           });
         });
 
         scrollToBottom();
+
+        /// 🔥 INSTANT SEEN UPDATE
+        ApiService.markAsSeen(widget.userId, widget.jwt);
       }
     });
-
-    loadMessages();
   }
 
   /// 🔥 LOAD MESSAGES
@@ -115,17 +124,18 @@ class _ChatScreenState extends State<ChatScreen> {
       "receiverId": widget.userId,
       "text": text,
       "createdAt": DateTime.now().toIso8601String(),
+      "seen": false,
     };
 
-    /// 🔥 instant UI
+    /// 🔥 INSTANT UI
     setState(() => messages.add(newMsg));
 
     scrollToBottom();
 
-    /// 🔥 socket send
+    /// 🔥 SOCKET
     socket.sendMessage(newMsg);
 
-    /// 🔥 save to DB
+    /// 🔥 API
     await ApiService.sendMessage(
       widget.userId,
       text,
@@ -135,9 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    /// 🔥 clean listeners properly
     socket.socket?.off("newMessage");
-
     socket.disconnect();
     controller.dispose();
     scrollController.dispose();

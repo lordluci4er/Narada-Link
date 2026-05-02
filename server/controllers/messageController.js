@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import admin from "../config/firebaseAdmin.js";
 
-/// 🔥 SEND MESSAGE (API + SOCKET + FCM)
+/// 🔥 SEND MESSAGE
 export const sendMessage = async (req, res) => {
   try {
     const senderId = (req.user?.id || req.user).toString();
@@ -20,12 +20,12 @@ export const sendMessage = async (req, res) => {
       senderId,
       receiverId: receiverIdStr,
       text,
+      seen: false,
     });
 
-    /// 🔥 GET SENDER (for name)
     const sender = await User.findById(senderId);
 
-    /// 🔥 SOCKET EMIT (REALTIME)
+    /// 🔥 SOCKET EMIT
     const io = req.app.get("io");
 
     io.to(receiverIdStr).emit("newMessage", {
@@ -36,7 +36,7 @@ export const sendMessage = async (req, res) => {
       senderName: sender?.name || "Narada Link User",
     });
 
-    /// 🔔 PUSH NOTIFICATION
+    /// 🔔 PUSH
     const receiver = await User.findById(receiverIdStr);
 
     if (receiver?.fcmToken) {
@@ -58,13 +58,13 @@ export const sendMessage = async (req, res) => {
       }
     }
 
-    /// 🔥 RESPONSE
     res.status(201).json({
       ...message.toObject(),
       senderId,
       receiverId: receiverIdStr,
       text: message.text || "",
       createdAt: message.createdAt,
+      seen: message.seen,
     });
 
   } catch (error) {
@@ -74,7 +74,7 @@ export const sendMessage = async (req, res) => {
 };
 
 
-/// 🔥 GET ALL MESSAGES
+/// 🔥 GET MESSAGES
 export const getMessages = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
@@ -93,6 +93,7 @@ export const getMessages = async (req, res) => {
       receiverId: m.receiverId.toString(),
       text: m.text || "",
       createdAt: m.createdAt,
+      seen: m.seen ?? false,
     }));
 
     res.json(formatted);
@@ -100,6 +101,30 @@ export const getMessages = async (req, res) => {
   } catch (error) {
     console.error("Get Messages Error:", error);
     res.status(500).json({ msg: "Server error" });
+  }
+};
+
+
+/// 🔥 MARK AS SEEN
+export const markAsSeen = async (req, res) => {
+  try {
+    const myId = (req.user?.id || req.user).toString();
+    const userId = req.params.userId.toString();
+
+    await Message.updateMany(
+      {
+        senderId: userId,
+        receiverId: myId,
+        seen: false,
+      },
+      { $set: { seen: true } }
+    );
+
+    res.json({ msg: "Seen updated" });
+
+  } catch (err) {
+    console.error("Mark Seen Error:", err);
+    res.status(500).json({ msg: "Error updating seen" });
   }
 };
 
@@ -152,12 +177,11 @@ export const getRecentChats = async (req, res) => {
 };
 
 
-/// 🔥 GET CONVERSATIONS (FINAL + NAME FIX)
+/// 🔥 GET CONVERSATIONS (🔥 FINAL WITH UNREAD COUNT)
 export const getConversations = async (req, res) => {
   try {
     const myId = (req.user?.id || req.user).toString();
 
-    /// 🔥 STEP 1: LAST MESSAGE PER USER
     const conversations = await Message.aggregate([
       {
         $match: {
@@ -167,6 +191,7 @@ export const getConversations = async (req, res) => {
           ],
         },
       },
+
       { $sort: { createdAt: -1 } },
 
       {
@@ -178,13 +203,29 @@ export const getConversations = async (req, res) => {
               "$senderId",
             ],
           },
+
           lastMessage: { $first: "$text" },
           createdAt: { $first: "$createdAt" },
+
+          /// 🔥 UNREAD COUNT
+          unreadCount: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$receiverId", myId] },
+                    { $eq: ["$seen", false] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
         },
       },
     ]);
 
-    /// 🔥 STEP 2: FETCH USERS
     const userIds = conversations.map(
       (c) => new mongoose.Types.ObjectId(c._id)
     );
@@ -193,7 +234,6 @@ export const getConversations = async (req, res) => {
       _id: { $in: userIds },
     }).select("name username avatar");
 
-    /// 🔥 STEP 3: MERGE DATA
     const result = conversations.map((c) => {
       const user = users.find(
         (u) => u._id.toString() === c._id.toString()
@@ -209,10 +249,10 @@ export const getConversations = async (req, res) => {
         avatar: user?.avatar || null,
         lastMessage: c.lastMessage || "",
         createdAt: c.createdAt,
+        unreadCount: c.unreadCount || 0,
       };
     });
 
-    /// 🔥 STEP 4: SORT
     result.sort(
       (a, b) =>
         new Date(b.createdAt) - new Date(a.createdAt)

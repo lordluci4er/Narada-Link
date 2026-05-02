@@ -12,7 +12,6 @@ class SocketService {
     required String userId,
     String? token,
   }) {
-    /// 🔥 prevent multiple connections
     if (socket != null && socket!.connected) return;
 
     socket = IO.io(
@@ -35,11 +34,10 @@ class SocketService {
       isConnected = true;
       print("🟢 Socket Connected");
 
-      /// 🔥 join room
+      /// 🔥 JOIN ROOM
       socket!.emit("join", userId.toString());
     });
 
-    /// 🔁 reconnect pe fir join
     socket!.onReconnect((_) {
       print("🔁 Reconnected");
       socket!.emit("join", userId.toString());
@@ -59,7 +57,7 @@ class SocketService {
     });
   }
 
-  /// 💬 SEND MESSAGE (MAP VERSION)
+  /// 💬 SEND MESSAGE
   void sendMessage(Map<String, dynamic> data) {
     if (!(socket?.connected ?? false)) {
       print("⚠️ Socket not connected");
@@ -69,18 +67,18 @@ class SocketService {
     socket!.emit("send_message", data);
   }
 
-  /// 📥 RECEIVE MESSAGE (OLD EVENT)
+  /// 📥 OLD EVENT (optional)
   void onMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
-    socket!.off("receive_message"); // 🔥 avoid duplicate
+    socket!.off("receive_message");
 
     socket!.on("receive_message", (data) {
       callback(data);
     });
   }
 
-  /// 🔥 NEW MESSAGE (FUTURE READY WITH NAME)
+  /// 🔥 NEW MESSAGE (MAIN EVENT)
   void onNewMessage(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -91,7 +89,18 @@ class SocketService {
     });
   }
 
-  /// ✍️ SEND TYPING
+  /// 🔥 AUTO REFRESH HELPER (🔥 IMPORTANT)
+  void onNewMessageRefresh(Function() callback) {
+    if (socket == null) return;
+
+    socket!.off("newMessage_refresh");
+
+    socket!.on("newMessage", (_) {
+      callback(); // 👉 e.g. loadChats()
+    });
+  }
+
+  /// ✍️ TYPING
   void sendTyping({
     required String senderId,
     required String receiverId,
@@ -104,7 +113,6 @@ class SocketService {
     });
   }
 
-  /// ✍️ LISTEN TYPING
   void onTyping(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -126,7 +134,7 @@ class SocketService {
     });
   }
 
-  /// 🔥 USER UPDATED (NAME CHANGE REALTIME)
+  /// 🔥 USER UPDATED
   void onUserUpdated(Function(dynamic) callback) {
     if (socket == null) return;
 
@@ -137,12 +145,13 @@ class SocketService {
     });
   }
 
-  /// 🔌 DISCONNECT (FULL CLEANUP)
+  /// 🔌 DISCONNECT
   void disconnect() {
     if (socket == null) return;
 
     socket!.off("receive_message");
-    socket!.off("newMessage"); // 🔥 ADD THIS
+    socket!.off("newMessage");
+    socket!.off("newMessage_refresh");
     socket!.off("typing");
     socket!.off("online_users");
     socket!.off("userUpdated");

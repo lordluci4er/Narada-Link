@@ -34,12 +34,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 REALTIME MESSAGE
+    /// 🔥 REALTIME MESSAGE (instant UI)
     socket.onMessage((data) {
       updateChatList(data);
     });
 
-    /// 🔥 NAME UPDATE REALTIME
+    /// 🔥 AUTO REFRESH (server sync)
+    socket.onNewMessageRefresh(() {
+      loadChats();
+    });
+
+    /// 🔥 NAME UPDATE
     socket.onUserUpdated((data) {
       loadChats();
     });
@@ -48,7 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     socket.socket?.off("receive_message");
+    socket.socket?.off("newMessage");
+    socket.socket?.off("newMessage_refresh");
     socket.socket?.off("userUpdated");
+
     socket.disconnect();
     super.dispose();
   }
@@ -85,8 +93,13 @@ class _HomeScreenState extends State<HomeScreen> {
       chats[index]['createdAt'] =
           DateTime.now().toIso8601String();
       chats[index]['senderId'] = senderId;
+
+      /// 🔥 UNREAD COUNT
+      if (senderId != widget.myId) {
+        chats[index]['unreadCount'] =
+            (chats[index]['unreadCount'] ?? 0) + 1;
+      }
     } else {
-      /// 🔥 NEW CHAT
       chats.insert(0, {
         'userId': otherUserId,
         'name': "Narada Link User",
@@ -95,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'lastMessage': text,
         'createdAt': DateTime.now().toIso8601String(),
         'senderId': senderId,
+        'unreadCount': senderId == widget.myId ? 0 : 1,
       });
     }
 
@@ -105,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {});
   }
 
-  /// 🔥 SAFE TIME FORMAT
+  /// 🔥 TIME FORMAT
   String formatChatTime(String? date) {
     if (date == null || date.isEmpty) return "";
 
@@ -207,7 +221,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final chat = chats[index];
 
         final userId = chat['userId'];
-
         final name =
             (chat['name'] ?? "Narada Link User").toString();
 
@@ -224,8 +237,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final time = formatChatTime(chat['createdAt']);
 
+        final unread = chat['unreadCount'] ?? 0;
+
         return GestureDetector(
           onTap: () {
+            chats[index]['unreadCount'] = 0;
+
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -233,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   jwt: widget.jwt,
                   userId: userId,
                   myId: widget.myId,
-                  name: name, // 🔥 FINAL FIX
+                  name: name,
                 ),
               ),
             ).then((_) => loadChats());
@@ -252,7 +269,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 22,
                   backgroundColor: AppColors.input,
                   backgroundImage:
-                      avatar != null && avatar.toString().isNotEmpty
+                      avatar != null &&
+                              avatar.toString().isNotEmpty
                           ? NetworkImage(avatar)
                           : null,
                   child: (avatar == null ||
@@ -278,19 +296,52 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: unread > 0
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
+
                       const SizedBox(height: 4),
-                      Text(
-                        lastMessage,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.secondary,
-                          fontSize: 12,
-                        ),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              lastMessage,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.secondary,
+                                fontSize: 12,
+                                fontWeight: unread > 0
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+
+                          if (unread > 0)
+                            Container(
+                              margin:
+                                  const EdgeInsets.only(left: 6),
+                              padding:
+                                  const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius:
+                                    BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                unread.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

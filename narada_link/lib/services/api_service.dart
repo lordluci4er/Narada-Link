@@ -4,28 +4,25 @@ import 'package:http/http.dart' as http;
 class ApiService {
   static const baseUrl = "https://narada-link.onrender.com";
 
-  /// 🔐 Google Login API
+  /// 🔐 LOGIN
   static Future<Map<String, dynamic>?> login(String token) async {
     try {
-      final response = await http.post(
+      final res = await http.post(
         Uri.parse("$baseUrl/api/auth/google"),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode({"token": token}),
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
       }
-
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  /// 🔥 SET NAME + USERNAME (UPDATED)
+  /// 🔥 SET NAME + USERNAME
   static Future<Map<String, dynamic>?> setUsername(
     String name,
     String username,
@@ -45,16 +42,15 @@ class ApiService {
       );
 
       if (res.statusCode == 200) {
-        return jsonDecode(res.body); // 🔥 IMPORTANT
+        return jsonDecode(res.body);
       }
-
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  /// 🆕 SET NAME (OPTIONAL SEPARATE API)
+  /// 🆕 SET NAME
   static Future<bool> setName(String name, String jwt) async {
     try {
       final res = await http.post(
@@ -67,80 +63,77 @@ class ApiService {
       );
 
       return res.statusCode == 200;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  /// 👤 Get Current User
-  static Future<Map<String, dynamic>?> getMe(String token) async {
+  /// 👤 GET ME
+  static Future<Map<String, dynamic>?> getMe(String jwt) async {
     try {
-      final response = await http.get(
+      final res = await http.get(
         Uri.parse("$baseUrl/api/users/me"),
         headers: {
-          "Authorization": "Bearer $token",
+          "Authorization": "Bearer $jwt",
           "Content-Type": "application/json",
         },
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
       }
-
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  /// 🔍 Search Users
+  /// 🔍 SEARCH USERS
   static Future<List> searchUsers(String query, String jwt) async {
     try {
-      final response = await http.get(
+      final res = await http.get(
         Uri.parse("$baseUrl/api/users/search?username=$query"),
         headers: {
           "Authorization": "Bearer $jwt",
         },
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
       }
-
       return [];
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
 
-  /// 💬 Get Messages
+  /// 💬 GET MESSAGES
   static Future<List> getMessages(String userId, String jwt) async {
     try {
-      final response = await http.get(
+      final res = await http.get(
         Uri.parse("$baseUrl/api/messages/$userId"),
         headers: {
           "Authorization": "Bearer $jwt",
         },
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
       }
-
       return [];
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
 
-  /// 📤 Send Message
+  /// 📤 SEND MESSAGE
   static Future<bool> sendMessage(
     String receiverId,
     String text,
     String jwt,
   ) async {
     try {
-      final response = await http.post(
+      final res = await http.post(
         Uri.parse("$baseUrl/api/messages"),
         headers: {
           "Content-Type": "application/json",
@@ -152,10 +145,22 @@ class ApiService {
         }),
       );
 
-      return response.statusCode == 201;
-    } catch (e) {
+      return res.statusCode == 201;
+    } catch (_) {
       return false;
     }
+  }
+
+  /// 🔥 MARK AS SEEN (NEW)
+  static Future<void> markAsSeen(String userId, String jwt) async {
+    try {
+      await http.put(
+        Uri.parse("$baseUrl/api/messages/seen/$userId"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+        },
+      );
+    } catch (_) {}
   }
 
   /// 🔔 SAVE FCM TOKEN
@@ -170,49 +175,45 @@ class ApiService {
           "Content-Type": "application/json",
           "Authorization": "Bearer $jwt",
         },
-        body: jsonEncode({
-          "token": fcmToken,
-        }),
+        body: jsonEncode({"token": fcmToken}),
       );
-    } catch (e) {}
+    } catch (_) {}
   }
 
   /// 💬 GET RECENT CHATS
   static Future<List> getRecentChats(String jwt) async {
     try {
-      final response = await http.get(
+      final res = await http.get(
         Uri.parse("$baseUrl/api/messages/recent"),
         headers: {
           "Authorization": "Bearer $jwt",
         },
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
       }
-
       return [];
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
 
-  /// 💬 GET CONVERSATIONS
+  /// 💬 GET CONVERSATIONS (WITH unreadCount)
   static Future<List> getConversations(String jwt) async {
     try {
-      final response = await http.get(
+      final res = await http.get(
         Uri.parse("$baseUrl/api/messages/conversations"),
         headers: {
           "Authorization": "Bearer $jwt",
         },
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
       }
-
       return [];
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
@@ -239,9 +240,8 @@ class ApiService {
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
       }
-
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
