@@ -50,7 +50,7 @@ class ApiService {
     }
   }
 
-  /// 🆕 SET NAME (🔥 NEW)
+  /// 🆕 SET NAME
   static Future<bool> setName(String name, String jwt) async {
     try {
       final res = await http.post(
@@ -170,9 +170,7 @@ class ApiService {
           "token": fcmToken,
         }),
       );
-    } catch (e) {
-      // silent fail
-    }
+    } catch (e) {}
   }
 
   /// 💬 GET RECENT CHATS
@@ -212,6 +210,35 @@ class ApiService {
       return [];
     } catch (e) {
       return [];
+    }
+  }
+
+  /// 🔥 UPDATE PROFILE (FINAL)
+  static Future<Map<String, dynamic>?> updateProfile(
+    String name,
+    String avatar,
+    String jwt,
+  ) async {
+    try {
+      final res = await http.put(
+        Uri.parse("$baseUrl/api/users/update"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "name": name,
+          "avatar": avatar,
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+
+      return null;
+    } catch (e) {
+      return null;
     }
   }
 }

@@ -1,21 +1,25 @@
 import express from "express";
+import protect from "../middleware/authMiddleware.js";
+
 import {
   setUsername,
-  setName,        // 🔥 NEW IMPORT
+  setName,
+  updateProfile, // 🔥 IMPORTANT ADD
   searchUsers,
   getMe,
   saveFcmToken,
 } from "../controllers/userController.js";
-
-import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 /// 🔥 SET USERNAME (FIRST TIME)
 router.post("/set-username", protect, setUsername);
 
-/// 🔥 SET NAME (NEW)
+/// 🔥 SET NAME
 router.post("/set-name", protect, setName);
+
+/// 🔥 UPDATE PROFILE (🔥 NEW MAIN API)
+router.put("/update", protect, updateProfile);
 
 /// 🔍 SEARCH USERS
 router.get("/search", protect, searchUsers);

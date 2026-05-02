@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'edit_profile_screen.dart'; // 🔥 IMPORTANT
 
 class ProfileScreen extends StatefulWidget {
   final String jwt;
@@ -51,9 +52,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔄 Loading
+    /// 🔄 LOADING
     if (loading) {
       return const Scaffold(
+        backgroundColor: AppColors.background,
         body: Center(
           child: CircularProgressIndicator(
             color: AppColors.primary,
@@ -62,10 +64,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // ❌ Error UI
+    /// ❌ ERROR
     if (error.isNotEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Profile")),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text("Profile"),
+          backgroundColor: AppColors.background,
+        ),
         body: Center(
           child: Text(
             error,
@@ -75,35 +81,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    final username = user?['username'] ?? "No Username";
-    final email = user?['email'] ?? "";
-    final avatar = user?['avatar'] ?? "";
+    final name = (user?['name'] ?? "No Name").toString();
+    final username = (user?['username'] ?? "").toString();
+    final email = (user?['email'] ?? "").toString();
+    final avatar = (user?['avatar'] ?? "").toString();
 
     return Scaffold(
+      backgroundColor: AppColors.background,
+
       appBar: AppBar(
         title: const Text("Profile"),
         centerTitle: true,
+        backgroundColor: AppColors.background,
+        elevation: 0,
+
+        /// 🔥 EDIT BUTTON (FIXED)
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(
+                    jwt: widget.jwt,        // ✅ FIX
+                    currentName: name,      // ✅ FIX
+                  ),
+                ),
+              ).then((updated) {
+                if (updated == true) {
+                  fetchUser(); // 🔥 refresh after edit
+                }
+              });
+            },
+          )
+        ],
       ),
 
       body: RefreshIndicator(
-        onRefresh: fetchUser, // 🔥 pull to refresh
+        onRefresh: fetchUser,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
             const SizedBox(height: 20),
 
-            // 👤 Avatar
+            /// 👤 AVATAR
             Center(
               child: CircleAvatar(
-                radius: 55,
+                radius: 50,
                 backgroundColor: AppColors.card,
                 backgroundImage:
                     avatar.isNotEmpty ? NetworkImage(avatar) : null,
                 child: avatar.isEmpty
-                    ? const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: AppColors.primary,
+                    ? Text(
+                        name.isNotEmpty
+                            ? name[0].toUpperCase()
+                            : "U",
+                        style: const TextStyle(
+                          fontSize: 24,
+                          color: AppColors.primary,
+                        ),
                       )
                     : null,
               ),
@@ -111,10 +148,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 20),
 
-            // 🧑 Username
+            /// 🧑 NAME
             Center(
               child: Text(
-                username,
+                name,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -123,22 +160,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
-            // 📧 Email
+            /// 🔥 USERNAME
             Center(
               child: Text(
-                email,
+                "@$username",
                 style: const TextStyle(
                   color: AppColors.secondary,
-                  fontSize: 13,
+                  fontSize: 14,
                 ),
               ),
             ),
 
+            const SizedBox(height: 20),
+
+            /// 📧 EMAIL
+            if (email.isNotEmpty)
+              Center(
+                child: Text(
+                  email,
+                  style: const TextStyle(
+                    color: AppColors.secondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+
             const SizedBox(height: 30),
 
-            // 🔥 Info Card
+            /// 📦 INFO CARD
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -147,16 +198,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  _infoRow("Username", username),
+                  _infoRow("Name", name),
                   const Divider(),
-                  _infoRow("Email", email),
+                  _infoRow("Username", "@$username"),
+                  if (email.isNotEmpty) ...[
+                    const Divider(),
+                    _infoRow("Email", email),
+                  ],
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // 🔄 Refresh Button
+            /// 🔄 REFRESH BUTTON
             ElevatedButton.icon(
               onPressed: fetchUser,
               icon: const Icon(Icons.refresh),
@@ -168,7 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 🔥 reusable row
+  /// 🔥 REUSABLE ROW
   Widget _infoRow(String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),

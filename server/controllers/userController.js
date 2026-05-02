@@ -24,7 +24,7 @@ export const setUsername = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // ❌ prevent change
+    /// ❌ prevent change
     if (currentUser.username) {
       return res.status(400).json({
         msg: "Username already set. Cannot change.",
@@ -55,7 +55,7 @@ export const setUsername = async (req, res) => {
 };
 
 
-/// 🔥 SET NAME (NEW)
+/// 🔥 SET NAME
 export const setName = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;
@@ -80,7 +80,39 @@ export const setName = async (req, res) => {
 };
 
 
-/// 🔍 SEARCH USERS (SECURE + CLEAN)
+/// 🔥 UPDATE PROFILE (NEW - FULL CONTROL)
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user;
+    const { name, avatar } = req.body;
+
+    const updateData = {};
+
+    /// 🔥 optional updates only
+    if (name && name.trim().length >= 2) {
+      updateData.name = name.trim();
+    }
+
+    if (avatar && avatar.trim().length > 0) {
+      updateData.avatar = avatar.trim();
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select("-__v");
+
+    res.json(updated);
+
+  } catch (err) {
+    console.error("Update Profile Error:", err);
+    res.status(500).json({ msg: "Profile update failed" });
+  }
+};
+
+
+/// 🔍 SEARCH USERS (SECURE)
 export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
@@ -94,11 +126,8 @@ export const searchUsers = async (req, res) => {
 
     const users = await User.find({
       username: { $regex: clean, $options: "i" },
-
-      /// 🔥 self remove
-      _id: { $ne: userId },
+      _id: { $ne: userId }, // 🔥 remove self
     })
-      /// 🔥 FIXED (NO EMAIL LEAK)
       .select("username name avatar")
       .limit(20);
 
