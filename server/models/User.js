@@ -8,10 +8,17 @@ const userSchema = new mongoose.Schema(
       unique: true,
     },
 
+    /// 🔥 FULL NAME (NEW FIELD)
+    name: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
     username: {
       type: String,
       unique: true,
-      sparse: true, // ✅ allow null usernames
+      sparse: true, // ✅ allow multiple nulls
       trim: true,
       lowercase: true,
       minlength: 3,
@@ -28,7 +35,7 @@ const userSchema = new mongoose.Schema(
 
     avatar: {
       type: String,
-      default: null, // ✅ safer
+      default: null,
     },
 
     /// 🔔 FCM TOKEN

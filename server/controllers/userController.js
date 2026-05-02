@@ -17,7 +17,6 @@ export const setUsername = async (req, res) => {
       return res.status(400).json({ msg: error });
     }
 
-    // 🔥 SAFE USER ID
     const userId = req.user?.id || req.user;
 
     const currentUser = await User.findById(userId);
@@ -32,7 +31,6 @@ export const setUsername = async (req, res) => {
       });
     }
 
-    // 🔥 ATOMIC UPDATE
     const updated = await User.findOneAndUpdate(
       {
         _id: userId,
@@ -57,7 +55,32 @@ export const setUsername = async (req, res) => {
 };
 
 
-/// 🔍 SEARCH USERS (SELF EXCLUDED)
+/// 🔥 SET NAME (NEW)
+export const setName = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user;
+    const { name } = req.body;
+
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ msg: "Valid name required" });
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      { name: name.trim() },
+      { new: true }
+    ).select("-__v");
+
+    res.json(updated);
+
+  } catch (err) {
+    console.error("Set Name Error:", err);
+    res.status(500).json({ msg: "Error setting name" });
+  }
+};
+
+
+/// 🔍 SEARCH USERS (SECURE + CLEAN)
 export const searchUsers = async (req, res) => {
   try {
     const { username } = req.query;
@@ -67,16 +90,16 @@ export const searchUsers = async (req, res) => {
     }
 
     const clean = username.toLowerCase().trim();
-
     const userId = req.user?.id || req.user;
 
     const users = await User.find({
       username: { $regex: clean, $options: "i" },
 
-      // 🔥 IMPORTANT: self remove
+      /// 🔥 self remove
       _id: { $ne: userId },
     })
-      .select("username avatar email")
+      /// 🔥 FIXED (NO EMAIL LEAK)
+      .select("username name avatar")
       .limit(20);
 
     res.json(users);
@@ -108,7 +131,7 @@ export const getMe = async (req, res) => {
 };
 
 
-/// 🔔 SAVE FCM TOKEN (🔥 PUSH NOTIFICATION CORE)
+/// 🔔 SAVE FCM TOKEN
 export const saveFcmToken = async (req, res) => {
   try {
     const userId = req.user?.id || req.user;

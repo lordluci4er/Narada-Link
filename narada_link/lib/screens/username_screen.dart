@@ -4,37 +4,52 @@ import 'main_screen.dart';
 
 class UsernameScreen extends StatefulWidget {
   final String jwt;
-  const UsernameScreen({super.key, required this.jwt});
+
+  const UsernameScreen({
+    super.key,
+    required this.jwt,
+  });
 
   @override
   State<UsernameScreen> createState() => _UsernameScreenState();
 }
 
 class _UsernameScreenState extends State<UsernameScreen> {
-  final controller = TextEditingController();
+  final nameController = TextEditingController();
+  final usernameController = TextEditingController();
+
   String error = "";
   bool loading = false;
 
   @override
   void dispose() {
-    controller.dispose(); // 🔥 memory safe
+    nameController.dispose();
+    usernameController.dispose();
     super.dispose();
   }
 
   void submit() async {
-    final username = controller.text.trim();
+    final name = nameController.text.trim();
+    final username = usernameController.text.trim();
+
+    /// 🔥 VALIDATION
+    if (name.isEmpty) {
+      setState(() => error = "Name cannot be empty");
+      return;
+    }
+
+    if (name.length < 2) {
+      setState(() => error = "Enter a valid name");
+      return;
+    }
 
     if (username.isEmpty) {
-      setState(() {
-        error = "Username cannot be empty";
-      });
+      setState(() => error = "Username cannot be empty");
       return;
     }
 
     if (username.length < 3) {
-      setState(() {
-        error = "Minimum 3 characters required";
-      });
+      setState(() => error = "Username must be at least 3 characters");
       return;
     }
 
@@ -43,15 +58,21 @@ class _UsernameScreenState extends State<UsernameScreen> {
       error = "";
     });
 
-    final res = await ApiService.setUsername(username, widget.jwt);
+    /// 🔥 API CALLS
+    final nameSuccess =
+        await ApiService.setName(name, widget.jwt);
 
-    if (!mounted) return; // 🔥 safety
+    final userRes =
+        await ApiService.setUsername(username, widget.jwt);
+
+    if (!mounted) return;
 
     setState(() {
       loading = false;
     });
 
-    if (res != null) {
+    /// ✅ SUCCESS
+    if (nameSuccess && userRes != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -60,7 +81,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
       );
     } else {
       setState(() {
-        error = "Username already taken or invalid";
+        error = "Username taken or something went wrong";
       });
     }
   }
@@ -71,7 +92,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
       resizeToAvoidBottomInset: true,
 
       appBar: AppBar(
-        title: const Text("Choose Username"),
+        title: const Text("Set Profile"),
         centerTitle: true,
       ),
 
@@ -81,9 +102,9 @@ class _UsernameScreenState extends State<UsernameScreen> {
           children: [
             const SizedBox(height: 20),
 
-            // 🔥 Title
+            /// 🔥 TITLE
             const Text(
-              "Create your identity",
+              "Create your profile",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -93,18 +114,32 @@ class _UsernameScreenState extends State<UsernameScreen> {
             const SizedBox(height: 8),
 
             const Text(
-              "This will be visible to others",
+              "Name & username will be visible to others",
               style: TextStyle(
                 color: Colors.grey,
                 fontSize: 13,
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
 
-            // 🔥 Input
+            /// 🔥 NAME INPUT
             TextField(
-              controller: controller,
+              controller: nameController,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                hintText: "Enter your name",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            /// 🔥 USERNAME INPUT
+            TextField(
+              controller: usernameController,
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => submit(),
               decoration: InputDecoration(
@@ -116,9 +151,9 @@ class _UsernameScreenState extends State<UsernameScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
 
-            // 🔥 Button
+            /// 🔥 BUTTON
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

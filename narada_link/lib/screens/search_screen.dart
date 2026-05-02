@@ -5,7 +5,7 @@ import 'chat_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final String jwt;
-  final String myId; // 🔥 ADD THIS
+  final String myId;
 
   const SearchScreen({
     super.key,
@@ -19,6 +19,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final controller = TextEditingController();
+
   List users = [];
   bool loading = false;
 
@@ -51,29 +52,29 @@ class _SearchScreenState extends State<SearchScreen> {
 
       body: Column(
         children: [
-          // 🔍 Search Bar
+          /// 🔍 SEARCH BAR
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: controller,
               onChanged: searchUsers,
               style: const TextStyle(color: AppColors.primary),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: "Search username...",
-                hintStyle: const TextStyle(color: AppColors.secondary),
-                prefixIcon: const Icon(Icons.search, color: AppColors.secondary),
+                hintStyle: TextStyle(color: AppColors.secondary),
+                prefixIcon: Icon(Icons.search, color: AppColors.secondary),
               ),
             ),
           ),
 
-          // 🔄 Loading
+          /// 🔄 LOADING
           if (loading)
             const Padding(
               padding: EdgeInsets.only(top: 20),
               child: CircularProgressIndicator(),
             ),
 
-          // 📋 Results
+          /// 📋 RESULTS
           Expanded(
             child: users.isEmpty
                 ? Center(
@@ -89,45 +90,66 @@ class _SearchScreenState extends State<SearchScreen> {
                     itemBuilder: (context, index) {
                       final user = users[index];
 
+                      final name =
+                          (user['name'] ?? "Unknown").toString();
+                      final username =
+                          (user['username'] ?? "").toString();
+                      final avatar = user['avatar'];
+
                       return ListTile(
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 16),
 
+                        /// 🔥 AVATAR
                         leading: CircleAvatar(
                           backgroundColor: AppColors.card,
                           backgroundImage:
-                              (user['avatar'] != null &&
-                                      user['avatar'].toString().isNotEmpty)
-                                  ? NetworkImage(user['avatar'])
+                              (avatar != null &&
+                                      avatar.toString().isNotEmpty)
+                                  ? NetworkImage(avatar)
                                   : null,
-                          child: (user['avatar'] == null ||
-                                  user['avatar'].toString().isEmpty)
-                              ? const Icon(Icons.person,
-                                  color: AppColors.primary)
+                          child: (avatar == null ||
+                                  avatar.toString().isEmpty)
+                              ? Text(
+                                  name.isNotEmpty
+                                      ? name[0].toUpperCase()
+                                      : "U",
+                                  style: const TextStyle(
+                                      color: AppColors.primary),
+                                )
                               : null,
                         ),
 
-                        title: Text(
-                          user['username'] ?? "",
-                          style:
-                              const TextStyle(color: AppColors.primary),
+                        /// 🔥 NAME + USERNAME UI
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              "@$username",
+                              style: const TextStyle(
+                                color: AppColors.secondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
 
-                        subtitle: Text(
-                          user['email'] ?? "",
-                          style:
-                              const TextStyle(color: AppColors.secondary),
-                        ),
-
+                        /// 🔥 OPEN CHAT
                         onTap: () {
-                          // 🔥 FIXED: REAL CHAT OPEN
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => ChatScreen(
                                 jwt: widget.jwt,
-                                userId: user['_id'],     // 🔥 selected user
-                                myId: widget.myId,       // 🔥 current user
+                                userId: user['_id'],
+                                myId: widget.myId,
                               ),
                             ),
                           );

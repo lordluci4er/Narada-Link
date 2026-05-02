@@ -50,6 +50,24 @@ class ApiService {
     }
   }
 
+  /// 🆕 SET NAME (🔥 NEW)
+  static Future<bool> setName(String name, String jwt) async {
+    try {
+      final res = await http.post(
+        Uri.parse("$baseUrl/api/users/set-name"),
+        headers: {
+          "Authorization": "Bearer $jwt",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"name": name}),
+      );
+
+      return res.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// 👤 Get Current User
   static Future<Map<String, dynamic>?> getMe(String token) async {
     try {
@@ -177,11 +195,11 @@ class ApiService {
     }
   }
 
-  /// 💬 GET CONVERSATIONS (🔥 NEW - FULL DATA)
+  /// 💬 GET CONVERSATIONS (FULL DATA)
   static Future<List> getConversations(String jwt) async {
     try {
       final response = await http.get(
-        Uri.parse("$baseUrl/api/messages/conversations"), // ✅ FIXED
+        Uri.parse("$baseUrl/api/messages/conversations"),
         headers: {
           "Authorization": "Bearer $jwt",
         },

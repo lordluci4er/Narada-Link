@@ -1,25 +1,29 @@
 import express from "express";
 import {
   setUsername,
+  setName,        // 🔥 NEW IMPORT
   searchUsers,
   getMe,
-  saveFcmToken, // 🔥 NEW IMPORT
+  saveFcmToken,
 } from "../controllers/userController.js";
 
 import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// 🔥 Set username (first time setup)
+/// 🔥 SET USERNAME (FIRST TIME)
 router.post("/set-username", protect, setUsername);
 
-// 🔍 Search users
+/// 🔥 SET NAME (NEW)
+router.post("/set-name", protect, setName);
+
+/// 🔍 SEARCH USERS
 router.get("/search", protect, searchUsers);
 
-// 👤 Get current logged-in user
+/// 👤 GET CURRENT USER
 router.get("/me", protect, getMe);
 
-// 🔔 Save FCM token (🔥 PUSH NOTIFICATION CORE)
+/// 🔔 SAVE FCM TOKEN
 router.post("/fcm-token", protect, saveFcmToken);
 
 export default router;
