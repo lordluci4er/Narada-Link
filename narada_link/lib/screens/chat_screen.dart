@@ -30,7 +30,6 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Map<String, dynamic>> messages = [];
   bool loading = false;
 
-  /// 🟢 USER STATUS
   bool isOnline = false;
   String? lastSeen;
 
@@ -46,7 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.connect(userId: widget.myId);
 
-    /// 🔥 NEW MESSAGE (REALTIME)
+    /// 🔥 NEW MESSAGE
     socket.onNewMessage((data) {
       final senderId = data['senderId']?.toString() ?? "";
 
@@ -94,7 +93,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    /// 🟢 USER STATUS SOCKET
+    /// 🟢 USER STATUS
     socket.socket?.on("userStatus", (data) {
       if (data['userId'] == widget.userId && mounted) {
         setState(() {
@@ -127,7 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🟢 LOAD STATUS
+  /// 🟢 USER STATUS API
   void loadUserStatus() async {
     final data =
         await ApiService.getUserStatus(widget.userId, widget.jwt);
@@ -140,12 +139,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 🔥 SCROLL (REVERSE LIST FIX)
+  /// 🔥 SCROLL FIX
   void scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (scrollController.hasClients) {
         scrollController.animateTo(
-          0, // 🔥 reverse list → bottom
+          0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -153,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// ✉️ SEND MESSAGE
+  /// ✉️ SEND
   void send() async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
@@ -197,7 +196,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return m['text']?.toString() ?? "";
   }
 
-  /// 👀 SEEN TEXT
   String getSeenText(String seenAt) {
     final diff =
         DateTime.now().difference(DateTime.parse(seenAt));
@@ -209,7 +207,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return "💤 Seen earlier today";
   }
 
-  /// 🟢 STATUS TEXT
   String getStatus() {
     if (isOnline) return "🟢 Online";
 
@@ -236,9 +233,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+
+      /// ✅ FIX 1 (ONLY THIS — NO manual padding)
       resizeToAvoidBottomInset: true,
 
-      /// 🔥 APPBAR
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -258,113 +256,109 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
 
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            children: [
-              if (loading)
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (messages.isEmpty)
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      "Start conversation 👋",
-                      style:
-                          TextStyle(color: AppColors.secondary),
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    reverse: true,
-                    padding:
-                        const EdgeInsets.fromLTRB(10, 10, 10, 80),
-                    itemCount: reversedMessages.length,
-                    itemBuilder: (context, index) {
-                      final m = reversedMessages[index];
-
-                      final isMe =
-                          m['senderId'].toString() == widget.myId;
-
-                      final isLastMessage = index == 0;
-
-                      return Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.end,
-                        children: [
-                          MessageBubble(
-                            text: getText(m),
-                            isMe: isMe,
-                            status: m['status'] ?? "sent",
-                            createdAt: m['createdAt'],
-                            seenAt: m['seenAt'],
+        child: Column(
+          children: [
+            /// 🔥 MESSAGES
+            Expanded(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : messages.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "Start conversation 👋",
+                            style: TextStyle(
+                                color: AppColors.secondary),
                           ),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          reverse: true,
 
-                          /// 🔥 ONLY LAST SEEN TEXT
-                          if (isMe &&
-                              isLastMessage &&
-                              m['status'] == "seen" &&
-                              m['seenAt'] != null)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  right: 16, bottom: 4),
-                              child: Text(
-                                getSeenText(m['seenAt']),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey,
+                          /// ✅ FIX 2 (SMALL padding only)
+                          padding: const EdgeInsets.only(
+                              left: 10, right: 10, top: 10, bottom: 10),
+
+                          itemCount: reversedMessages.length,
+                          itemBuilder: (context, index) {
+                            final m = reversedMessages[index];
+
+                            final isMe =
+                                m['senderId'].toString() ==
+                                    widget.myId;
+
+                            final isLastMessage = index == 0;
+
+                            return Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.end,
+                              children: [
+                                MessageBubble(
+                                  text: getText(m),
+                                  isMe: isMe,
+                                  status: m['status'] ?? "sent",
+                                  createdAt: m['createdAt'],
+                                  seenAt: m['seenAt'],
                                 ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
 
-              /// 🔥 INPUT
-              Container(
-                padding: EdgeInsets.only(
-                  left: 10,
-                  right: 10,
-                  top: 8,
-                  bottom: MediaQuery.of(context).padding.bottom,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        style: const TextStyle(
-                          color: AppColors.primary,
+                                if (isMe &&
+                                    isLastMessage &&
+                                    m['status'] == "seen" &&
+                                    m['seenAt'] != null)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.only(
+                                            right: 16, bottom: 4),
+                                    child: Text(
+                                      getSeenText(m['seenAt']),
+                                      style:
+                                          const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
-                        decoration: const InputDecoration(
-                          hintText: "Type a message...",
-                          hintStyle: TextStyle(
-                            color: AppColors.secondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: send,
-                      icon: const Icon(
-                        Icons.send,
+            ),
+
+            /// 🔥 INPUT (NO keyboard padding here ❌)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Colors.black,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      style: const TextStyle(
                         color: AppColors.primary,
                       ),
-                    )
-                  ],
-                ),
-              )
-            ],
-          ),
+                      decoration: const InputDecoration(
+                        hintText: "Type a message...",
+                        hintStyle: TextStyle(
+                          color: AppColors.secondary,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: send,
+                    icon: const Icon(
+                      Icons.send,
+                      color: AppColors.primary,
+                    ),
+                  )
+                ],
+              ),
+            )
+          ],
         ),
       ),
     );
